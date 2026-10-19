@@ -1,124 +1,141 @@
-/* Pure game rules and fixed-step physics. Shared by the browser and Node tests. */
-(function (root) {
+/* Glyph pixels are the world geometry; no rectangular platforms under letters. */
+(function(root){
   'use strict';
-  const CELL = 50, COLS = 20, ROWS = 10;
-  const WORDS = {
-    '木': {name:'足場', color:'#728c59', title:'木は、足場になる。', description:'乗れる足場をつくる。火が隣にあると燃えて消える。'},
-    '火': {name:'燃やす', color:'#c76b43', title:'火は、道をひらく。', description:'隣り合う木・蔦をまとめて燃やす。触れるとスタートへ戻る。'},
-    '水': {name:'消火', color:'#5b99a7', title:'水は、火をしずめる。', description:'隣り合う火をまとめて消す。水そのものにも足場として乗れる。'},
-    '風': {name:'上昇', color:'#86a391', title:'風は、空へ運ぶ。', description:'文字の上に上昇気流が生まれる。気流の中で高く浮かび上がる。'},
-    '氷': {name:'滑る', color:'#7caeba', title:'氷は、勢いをつくる。', description:'つるつる滑る足場。走ると速くなり、遠くまで跳べる。火が隣にあると溶けて水になる。'}
-  };
-  const LEVELS = [
-    {title:'はじまりの橋',chapter:'第一景',kicker:'一文字から、はじまる旅。',budget:6,start:[1,8],goal:[18,8],hint:'谷に「木」の道を。足場のあいだはジャンプで渡れる。落ちても何度でも挑戦できる。',regions:[[0,8,5,2],[14,8,6,2]],vines:[],flames:[]},
-    {title:'燃えることば',chapter:'第二景',kicker:'閉ざすものにも、意味がある。',budget:5,start:[1,8],goal:[18,8],hint:'蔦の壁は「火」を隣に置くと燃える。開いた道に火が残ったら、「水」を隣へ。',regions:[[0,8,20,2]],vines:[[10,0,1,8]],flames:[[14,7],[15,7]]},
-    {title:'風のたより',chapter:'第三景',kicker:'届かない場所へ、ことばを。',budget:7,start:[1,8],goal:[18,3],hint:'「風」の上には6マス分の上昇気流。高く上がったら、空中の足場へ。気流は左右に少し広がっている。',regions:[[0,8,6,2],[13,3,7,7]],vines:[],flames:[]},
-    {title:'ことばを紡ぐ',chapter:'最終景',kicker:'あなたの一筆が、世界をつなぐ。',budget:9,start:[1,8],goal:[18,4],hint:'蔦を燃やし、火を消し、風で高みへ。「氷」は速く走れて遠くへ跳べる。自由な組み合わせで道をつくろう。',regions:[[0,8,4,2],[12,4,8,6]],vines:[[8,0,1,8]],flames:[[15,3],[16,3]]}
+  const WIDTH=1000,HEIGHT=500;
+  const GRAVITY={軽:550,並:1050,重:1550};
+  const LEVELS=[
+    {title:'文字の輪郭',chapter:'第一景',kicker:'線に乗って、空白を渡る。',budget:7,start:[65,420],goal:[925,420],jumps:'二',gravity:'並',hint:'「一」の横線も「回」の囲みも、そのまま足場。まずは二段ジャンプで線に乗ってみよう。',regions:[{x:0,y:420,w:220,h:80},{x:790,y:420,w:210,h:80}],letters:[['一',285,325,160],['回',530,250,160]]},
+    {title:'回のなかへ',chapter:'第二景',kicker:'囲みの中にも、道がある。',budget:7,start:[55,430],goal:[935,230],jumps:'三',gravity:'並',hint:'「回」の空白には入れる。文字の横線を踏みながら高みへ。漢数字を変えるとジャンプの回数も変わる。',regions:[{x:0,y:430,w:180,h:70},{x:825,y:230,w:175,h:270}],letters:[['山',250,305,170],['回',510,190,180],['一',705,145,120]]},
+    {title:'軽やかな一筆',chapter:'第三景',kicker:'同じ文字でも、ルールで変わる。',budget:7,start:[60,430],goal:[920,220],jumps:'二',gravity:'軽',hint:'「軽」はゆっくり落ちる重力。「並」「重」と書きかえて、同じ足場で跳び方が変わるのを試そう。',regions:[{x:0,y:430,w:180,h:70},{x:820,y:220,w:180,h:280}],letters:[['川',275,300,170],['空',540,185,180]]},
+    {title:'自由なことば',chapter:'最終景',kicker:'あなたの漢字で、あなたの道を。',budget:9,start:[50,430],goal:[930,180],jumps:'三',gravity:'並',hint:'好きな漢字と、好きなルールで。線の少ない文字は渡りやすく、複雑な文字には思わぬ足場が隠れている。',regions:[{x:0,y:430,w:170,h:70},{x:850,y:180,w:150,h:320}],letters:[['夢',290,280,180],['道',565,160,180]]}
   ];
-  const key = (x,y) => `${x},${y}`;
-  class Game {
-    constructor(index = 0) { this.load(index); }
-    load(index) {
-      this.index = index; this.level = LEVELS[index]; this.terrain = new Map(); this.placed = new Map(); this.effects = [];
-      for (const [x,y,w,h] of this.level.regions) for (let a=x;a<x+w;a++) for(let b=y;b<y+h;b++) this.terrain.set(key(a,b),'stone');
-      for (const [x,y,w,h] of this.level.vines) for (let a=x;a<x+w;a++) for(let b=y;b<y+h;b++) this.terrain.set(key(a,b),'vine');
-      for (const [x,y] of this.level.flames) this.terrain.set(key(x,y),'火');
-      this.running = false; this.won = false; this.deaths = 0; this.elapsed = 0; this.casts = 0; this.lastEvent = ''; this.respawn();
-    }
-    respawn() {
-      this.player = {x:this.level.start[0]*CELL+13,y:this.level.start[1]*CELL-36,w:24,h:36,vx:0,vy:0,grounded:false,surface:null,facing:1};
-      this.jumpHeld = false;
-    }
-    get remaining() { return this.level.budget - this.placed.size; }
-    at(x,y) { return this.placed.get(key(x,y)) || this.terrain.get(key(x,y)); }
-    canPlace(x,y) {
-      if (this.running || this.won || x<0 || x>=COLS || y<1 || y>8 || this.terrain.has(key(x,y))) return false;
-      const [gx,gy] = this.level.goal;
-      if (x===gx && (y===gy-1 || y===gy-2)) return false;
-      const p=this.player;
-      return !(p.x < (x+1)*CELL && p.x+p.w>x*CELL && p.y<(y+1)*CELL && p.y+p.h>y*CELL);
-    }
-    place(x,y,word) {
-      if (!WORDS[word]) return {ok:false,message:'対応している漢字は「木・火・水・風・氷」です。'};
-      if (!this.canPlace(x,y)) return {ok:false,message:'空いている点線のマスに置いてください。旅人や門には重ねられません。'};
-      const k=key(x,y);
-      if(this.placed.has(k)) { this.placed.delete(k); return {ok:true,message:'文字を回収しました。墨が1つ戻りました。'}; }
-      if(this.remaining<=0) return {ok:false,message:'墨を使い切りました。置いた文字をクリックすると回収できます。'};
-      this.placed.set(k,word); this.casts++;
-      const reactions=this.react();
-      return {ok:true,message:reactions || `「${word}」を置きました。${WORDS[word].title}`};
-    }
-    remove(x,y) {
-      if(this.running || this.won) return false;
-      return this.placed.delete(key(x,y));
-    }
-    react() {
-      let burned=0, quenched=0, melted=0, changed=true;
-      const adjacent = k => {const [x,y]=k.split(',').map(Number);return [key(x-1,y),key(x+1,y),key(x,y-1),key(x,y+1)];};
-      const erase = k => {this.placed.delete(k);this.terrain.delete(k);};
-      // Water acts first. Every connected flame is extinguished, including authored hazards.
-      for(const [k,v] of [...this.terrain,...this.placed]) if(v==='水') {
-        const queue=adjacent(k),seen=new Set();
-        while(queue.length) {const n=queue.pop();if(seen.has(n))continue;seen.add(n);const [x,y]=n.split(',').map(Number);if(this.at(x,y)==='火'){erase(n);quenched++;queue.push(...adjacent(n));}}
-      }
-      while(changed) {
-        changed=false;
-        for(const [k,v] of [...this.terrain,...this.placed]) if(v==='火') {
-          const queue=adjacent(k),seen=new Set();
-          while(queue.length) {
-            const n=queue.pop();if(seen.has(n))continue;seen.add(n);const [x,y]=n.split(',').map(Number),t=this.at(x,y);
-            if(t==='木'||t==='vine') {erase(n);burned++;changed=true;this.effects.push({x:x*CELL+25,y:y*CELL+25,kind:'burn',life:1});queue.push(...adjacent(n));}
-            else if(t==='氷') {if(this.placed.has(n))this.placed.set(n,'水');else this.terrain.set(n,'水');melted++;changed=true;}
-          }
-        }
-        if(changed) for(const [k,v] of [...this.terrain,...this.placed]) if(v==='水') {
-          const queue=adjacent(k),seen=new Set();
-          while(queue.length){const n=queue.pop();if(seen.has(n))continue;seen.add(n);const [x,y]=n.split(',').map(Number);if(this.at(x,y)==='火'){erase(n);quenched++;queue.push(...adjacent(n));}}
-        }
-      }
-      return [burned?`火が木と蔦を${burned}マス燃やし、道がひらいた。`:'',melted?'氷が溶けて水になった。':'',quenched?`水が火を${quenched}マス消した。`:''].filter(Boolean).join(' ');
-    }
-    colliders() {
-      return [...this.terrain,...this.placed].filter(([,v])=>v!=='火').map(([k,type])=>{const [x,y]=k.split(',').map(Number);return {x:x*CELL,y:y*CELL,w:CELL,h:CELL,type};});
-    }
-    overlaps(a,b) {return a.x < b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y;}
-    step(dt,input={}) {
-      for(const fx of this.effects)fx.life-=dt;this.effects=this.effects.filter(f=>f.life>0);
-      if(!this.running||this.won)return;
-      this.elapsed+=dt;
-      const p=this.player, ice=p.grounded&&p.surface==='氷';
-      const direction=(input.right?1:0)-(input.left?1:0), maxSpeed=(ice||(!p.grounded&&Math.abs(p.vx)>200))?310:200;
-      const accel=ice?500:1700;
-      if(direction){p.vx+=direction*accel*dt;p.vx=Math.max(-maxSpeed,Math.min(maxSpeed,p.vx));p.facing=direction;}
-      else{const friction=ice?100:1900;p.vx=Math.sign(p.vx)*Math.max(0,Math.abs(p.vx)-friction*dt);}
-      if(input.jump&&!this.jumpHeld&&p.grounded){p.vy=-500;p.grounded=false;}
-      this.jumpHeld=!!input.jump;
-      let wind=false;
-      for(const [k,v] of this.placed) if(v==='風') {
-        const [x,y]=k.split(',').map(Number);
-        if(p.x+p.w>x*CELL-22&&p.x<(x+1)*CELL+22&&p.y+p.h<=y*CELL+8&&p.y+p.h>y*CELL-300) wind=true;
-      }
-      p.vy=wind?Math.max(-290,p.vy-2500*dt):Math.min(700,p.vy+1250*dt);
-      const solids=this.colliders();
-      p.x+=p.vx*dt;
-      for(const s of solids)if(this.overlaps(p,s)){if(p.vx>0)p.x=s.x-p.w;else if(p.vx<0)p.x=s.x+s.w;p.vx=0;}
-      p.x=Math.max(0,Math.min(COLS*CELL-p.w,p.x));
-      p.y+=p.vy*dt;p.grounded=false;p.surface=null;
-      for(const s of solids)if(this.overlaps(p,s)) {
-        if(p.vy>0){p.y=s.y-p.h;p.grounded=true;p.surface=s.type;}else if(p.vy<0)p.y=s.y+s.h;
-        p.vy=0;
-      }
-      if(p.y<0){p.y=0;p.vy=0;}
-      for(const [k,v] of [...this.terrain,...this.placed])if(v==='火') {
-        const [x,y]=k.split(',').map(Number);
-        if(this.overlaps(p,{x:x*CELL+5,y:y*CELL+4,w:40,h:46})){this.fail('火に触れました。「水」を隣に置いて消してみよう。');return;}
-      }
-      if(p.y>ROWS*CELL+50){this.fail('谷に落ちました。配置はそのまま。もう一度挑戦しよう。');return;}
-      const [gx,gy]=this.level.goal;
-      if(this.overlaps(p,{x:gx*CELL+8,y:gy*CELL-65,w:38,h:65})) {this.won=true;this.running=false;this.lastEvent='win';}
-    }
-    fail(message){this.deaths++;this.respawn();this.running=false;this.lastEvent=message;}
+  function isHan(value){
+    const chars=Array.from(value);
+    if(chars.length!==1)return false;
+    const n=chars[0].codePointAt(0);
+    return n===0x3007||(n>=0x3400&&n<=0x4dbf)||(n>=0x4e00&&n<=0x9fff)||(n>=0xf900&&n<=0xfaff)||(n>=0x20000&&n<=0x323af);
   }
-  const api={Game,WORDS,LEVELS,CELL,COLS,ROWS};
+  function parseNumber(value){
+    const source=String(value).trim();
+    const digits={零:0,〇:0,一:1,二:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,壱:1,弐:2,参:3};
+    const units={十:10,拾:10,百:100,千:1000};
+    if(!source)return null;
+    const chars=Array.from(source);
+    if(chars.every(c=>Object.prototype.hasOwnProperty.call(digits,c))){
+      const result=Number(chars.map(c=>digits[c]).join(''));
+      return Number.isSafeInteger(result)&&result<=9999?result:null;
+    }
+    let result=0,pending=null,lastUnit=10000;
+    for(const char of chars){
+      if(Object.prototype.hasOwnProperty.call(digits,char)){
+        if(pending!==null||digits[char]===0)return null;
+        pending=digits[char];
+      }else if(units[char]){
+        const unit=units[char];if(unit>=lastUnit)return null;
+        result+=(pending===null?1:pending)*unit;pending=null;lastUnit=unit;
+      }else return null;
+    }
+    result+=pending===null?0:pending;
+    return result<=9999?result:null;
+  }
+  function buildMask(width,height,alpha,threshold=40){
+    const stride=width+1,prefix=new Uint32Array(stride*(height+1));let ink=0;
+    for(let y=0;y<height;y++){
+      let row=0;
+      for(let x=0;x<width;x++){const filled=alpha[y*width+x]>threshold?1:0;row+=filled;ink+=filled;prefix[(y+1)*stride+x+1]=prefix[y*stride+x+1]+row;}
+    }
+    return {width,height,prefix,ink};
+  }
+  function intersects(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
+  function maskIntersects(mask,x,y,rect){
+    const left=Math.max(0,Math.floor(rect.x-x)),right=Math.min(mask.width,Math.ceil(rect.x+rect.w-x));
+    const top=Math.max(0,Math.floor(rect.y-y)),bottom=Math.min(mask.height,Math.ceil(rect.y+rect.h-y));
+    if(left>=right||top>=bottom)return false;
+    const p=mask.prefix,s=mask.width+1;
+    return p[bottom*s+right]-p[top*s+right]-p[bottom*s+left]+p[top*s+left]>0;
+  }
+  class Game{
+    constructor(index=0,makeGlyph){this.makeGlyph=makeGlyph;this.load(index);}
+    load(index){
+      this.index=index;this.level=LEVELS[index];this.placed=[];this.nextId=1;
+      this.rules={jumpCount:parseNumber(this.level.jumps),gravity:this.level.gravity};
+      this.running=false;this.won=false;this.deaths=0;this.elapsed=0;this.lastEvent='';this.respawn();
+      if(this.makeGlyph)for(const [char,x,y,size]of this.level.letters)this.placed.push({id:this.nextId++,char,x,y,size,mask:this.makeGlyph(char,size)});
+    }
+    respawn(){this.player={x:this.level.start[0],y:this.level.start[1]-30,w:18,h:30,vx:0,vy:0,grounded:false,facing:1,jumpsUsed:0};this.jumpHeld=false;}
+    get remaining(){return this.level.budget-this.placed.length;}
+    get jumpsLeft(){return Math.max(0,this.rules.jumpCount-this.player.jumpsUsed);}
+    setRules(number,gravity){
+      if(this.running||this.won)return {ok:false,message:'配置モードでルールを書きかえてください。'};
+      const count=parseNumber(number);
+      if(count===null)return {ok:false,message:'回数には「零〜九千九百九十九」の漢数字を入れてください。例：三、十、二十三。'};
+      if(!Object.prototype.hasOwnProperty.call(GRAVITY,gravity))return {ok:false,message:'重力には「軽・並・重」のいずれかを入れてください。'};
+      this.rules={jumpCount:count,gravity};this.respawn();
+      return {ok:true,message:`ルール変更：着地まで${count}回ジャンプ、重力は「${gravity}」。旅人をスタートへ戻しました。`};
+    }
+    glyphAt(x,y){return [...this.placed].reverse().find(g=>x>=g.x&&x<g.x+g.size&&y>=g.y&&y<g.y+g.size);}
+    canPlace(x,y,size,mask){
+      if(this.running||this.won||x<0||y<50||x+size>WIDTH||y+size>HEIGHT-5)return false;
+      if(!mask||!mask.ink)return false;
+      if(maskIntersects(mask,x,y,this.player))return false;
+      for(const terrain of this.level.regions)if(maskIntersects(mask,x,y,terrain))return false;
+      const[gx,gy]=this.level.goal;
+      return !maskIntersects(mask,x,y,{x:gx-32,y:gy-75,w:64,h:75});
+    }
+    place(x,y,char,size=160){
+      if(!isHan(char))return {ok:false,message:'漢字を一文字入力してください。好きな漢字の形を足場にできます。'};
+      if(!this.makeGlyph)return {ok:false,message:'文字の字体を準備しています。'};
+      if(!Number.isInteger(size)||size<100||size>200)return {ok:false,message:'文字の大きさは100〜200で指定してください。'};
+      const mask=this.makeGlyph(char,size);
+      if(!this.canPlace(x,y,size,mask))return {ok:false,message:'文字の線が地面・旅人・門に重ならない場所に置いてください。'};
+      if(this.remaining<=0)return {ok:false,message:'文字数の上限です。置いた文字をクリックすると回収できます。'};
+      this.placed.push({id:this.nextId++,char,x,y,size,mask});
+      return {ok:true,message:`「${char}」を置きました。色のついた線にだけ乗れます。文字の空白は通り抜けられます。`};
+    }
+    remove(id){if(this.running||this.won)return false;const index=this.placed.findIndex(g=>g.id===id);if(index<0)return false;this.placed.splice(index,1);return true;}
+    clear(){if(this.running||this.won)return;this.placed=[];this.respawn();}
+    solidAt(rect){
+      for(const region of this.level.regions)if(intersects(rect,region))return {type:'ground'};
+      for(const glyph of this.placed)if(maskIntersects(glyph.mask,glyph.x,glyph.y,rect))return {type:'glyph',glyph};
+      return null;
+    }
+    moveAxis(delta,axis){
+      const p=this.player,steps=Math.ceil(Math.abs(delta));if(!steps)return;
+      const amount=delta/steps;
+      for(let i=0;i<steps;i++){
+        const before=p[axis];p[axis]+=amount;
+        const collision=this.solidAt(p);
+        if(!collision)continue;
+        if(axis==='x'&&p.grounded){
+          let climbed=false;
+          for(let rise=1;rise<=3;rise++)if(!this.solidAt({...p,y:p.y-rise})){p.y-=rise;climbed=true;break;}
+          if(climbed)continue;
+        }
+        p[axis]=before;
+        if(axis==='y'){
+          if(delta>0){p.grounded=true;p.jumpsUsed=0;p.surface=collision.type==='glyph'?collision.glyph.char:'地';}
+          p.vy=0;
+        }else p.vx=0;
+        break;
+      }
+    }
+    step(dt,input={}){
+      if(!this.running||this.won)return;
+      this.elapsed+=dt;const p=this.player;
+      const direction=(input.right?1:0)-(input.left?1:0);
+      if(direction){p.vx=Math.max(-185,Math.min(185,p.vx+direction*1400*dt));p.facing=direction;}
+      else p.vx=Math.sign(p.vx)*Math.max(0,Math.abs(p.vx)-1600*dt);
+      if(input.jump&&!this.jumpHeld&&p.jumpsUsed<this.rules.jumpCount){p.vy=-430;p.grounded=false;p.jumpsUsed++;}
+      this.jumpHeld=!!input.jump;
+      p.vy=Math.min(650,p.vy+GRAVITY[this.rules.gravity]*dt);
+      this.moveAxis(p.vx*dt,'x');p.x=Math.max(0,Math.min(WIDTH-p.w,p.x));
+      p.grounded=false;this.moveAxis(p.vy*dt,'y');
+      if(p.y<35){p.y=35;p.vy=0;}
+      if(p.y>HEIGHT+60){this.deaths++;this.respawn();this.running=false;this.lastEvent='落ちても文字は残ります。配置やルールを変えて、もう一度。';return;}
+      const[gx,gy]=this.level.goal;
+      if(intersects(p,{x:gx-18,y:gy-64,w:36,h:64})){this.won=true;this.running=false;this.lastEvent='win';}
+    }
+  }
+  const api={Game,LEVELS,WIDTH,HEIGHT,GRAVITY,isHan,parseNumber,buildMask,maskIntersects};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Kotonoha=api;
 })(typeof window!=='undefined'?window:globalThis);

@@ -80,7 +80,16 @@ for(const button of document.querySelectorAll('[data-control]')){
 function openHelp(){clearInput();game.running=false;updateUI();$('#help').showModal();}
 $('#help-open').addEventListener('click',openHelp);
 for(const id of ['#help-close','#help-start'])$(id).addEventListener('click',()=>$('#help').close());
-function rect(x,y,w,h,fill,r=0){ctx.fillStyle=fill;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
+function rect(x,y,w,h,fill,r=0){
+  ctx.fillStyle=fill;ctx.beginPath();
+  // Rounded paths work on browsers that do not implement Canvas.roundRect.
+  const radius=Math.max(0,Math.min(r,w/2,h/2));
+  ctx.moveTo(x+radius,y);ctx.lineTo(x+w-radius,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+radius);ctx.lineTo(x+w,y+h-radius);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-radius,y+h);ctx.lineTo(x+radius,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-radius);ctx.lineTo(x,y+radius);
+  ctx.quadraticCurveTo(x,y,x+radius,y);ctx.closePath();ctx.fill();
+}
 function line(x1,y1,x2,y2,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();}
 function text(value,x,y,size,color,font='serif'){ctx.font=`${size}px ${font}`;ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(value,x,y);}
 function mountain(points,color){ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(0,500);for(const [x,y] of points)ctx.lineTo(x,y);ctx.lineTo(1000,500);ctx.closePath();ctx.fill();}
@@ -173,6 +182,6 @@ function frame(timestamp){
   const delta=Math.min((timestamp-previous)/1000||0,0.05);previous=timestamp;clock+=delta;accumulator+=delta;
   while(accumulator>=1/120){game.step(1/120,{...input,jump:input.jump||jumpQueued});jumpQueued=false;accumulator-=1/120;}
   if(game.lastEvent){const event=game.lastEvent;game.lastEvent='';if(event==='win')onWin();else{clearInput();updateUI();tell(event,true);}}
-  draw();requestAnimationFrame(frame);
+  draw();document.documentElement.setAttribute('data-game-ready','');requestAnimationFrame(frame);
 }
-selectWord('木');updateUI();tell(game.level.hint);requestAnimationFrame(frame);
+selectWord('木');updateUI();tell(game.level.hint);draw();document.documentElement.setAttribute('data-game-ready','');requestAnimationFrame(frame);

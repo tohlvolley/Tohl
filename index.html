@@ -6,11 +6,32 @@
 <meta name="theme-color" content="#eee9dc">
 <meta name="description" content="書いた漢字が世界のルールになる。足場と仕掛けを生み出して旅人を導く、漢字アクションパズル。">
 <title>言ノ葉の道 — 漢字でつくるパズル</title>
-<link rel="stylesheet" href="style.css">
-<script src="engine.js" defer></script>
-<script src="game.js" defer></script>
+<link rel="stylesheet" href="style.css?v=kotonoha-2">
+<script>
+// Show a useful message even when an asset fails before the game starts.
+(function () {
+  function showLoadError() {
+    var notice = document.getElementById('notice');
+    if (notice) {
+      notice.textContent = 'ゲームを読み込めませんでした。Ctrl + Shift + R（MacのSafari は ⌥ + ⌘ + R）で再読み込みしてください。改善しない場合は、この案内文をお知らせください。';
+      notice.classList.add('error');
+    }
+    var play = document.getElementById('play');
+    if (play) play.disabled = true;
+  }
+  window.addEventListener('error', function (event) {
+    if (event.error || (event.target && event.target.tagName === 'SCRIPT')) showLoadError();
+  }, true);
+  window.addEventListener('load', function () {
+    if (!document.documentElement.hasAttribute('data-game-ready')) showLoadError();
+  });
+}());
+</script>
+<script src="engine.js?v=kotonoha-2" defer></script>
+<script src="game.js?v=kotonoha-2" defer></script>
 </head>
 <body>
+<noscript><p class="notice error">ゲームを遊ぶには、ブラウザのJavaScriptを有効にしてください。</p></noscript>
 <main class="shell">
 <header><a class="brand" href="./"><span class="brand-mark">言</span><span>言ノ葉の道<small>KOTONOHA NO MICHI</small></span></a><span class="header-note">漢字でつくる、小さな冒険。</span><button id="help-open" class="quiet">遊び方 <span>?</span></button></header>
 <section class="heading"><div><p class="eyebrow">A WORD CAN CHANGE THE WORLD</p><h1>その一文字が、<em>道になる。</em></h1><p>漢字を置いて、世界のルールを書きかえよう。</p></div><div class="chapter-nav" id="chapters" aria-label="ステージ選択"></div></section>

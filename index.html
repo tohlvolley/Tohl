@@ -1,22 +1,38 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tohl — スライドパズル</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#eee9dc">
+<meta name="description" content="書いた漢字が世界のルールになる。足場と仕掛けを生み出して旅人を導く、漢字アクションパズル。">
+<title>言ノ葉の道 — 漢字でつくるパズル</title>
 <link rel="stylesheet" href="style.css">
+<script src="engine.js" defer></script>
 <script src="game.js" defer></script>
 </head>
 <body>
-<main>
-<header><a class="brand" href="./">Tohl<span>PLAY ROOM</span></a><span class="edition">01 / SLIDE PUZZLE</span></header>
-<section class="intro"><p class="eyebrow">ひとつずつ、整う心地よさ。</p><h1>小さなひらめき、<br>大きな達成感。</h1><p class="description">空いたマスへタイルを動かして、数字を順番に。<br>あせらず、自分のペースで楽しもう。</p></section>
-<section class="game" aria-label="スライドパズル">
-<div class="toolbar"><label>難易度 <select id="size"><option value="3">3 × 3 · やさしい</option><option value="4">4 × 4 · むずかしい</option></select></label><span class="live"><i></i> LET’S PLAY</span></div>
-<div class="stats"><div><span>MOVES / 手数</span><strong id="moves">0</strong></div><div><span>TIME / 時間</span><strong id="time">00:00</strong></div><div><span>BEST / 最少手数</span><strong id="best">—</strong></div></div>
-<div id="board" class="board" aria-label="数字のタイル"></div>
-<p id="message" class="message" role="status" aria-live="polite">数字をタップして、空いたマスへ。</p>
-<button id="restart" class="restart">↻ <span>新しいパズル</span></button>
+<main class="shell">
+<header><a class="brand" href="./"><span class="brand-mark">言</span><span>言ノ葉の道<small>KOTONOHA NO MICHI</small></span></a><span class="header-note">漢字でつくる、小さな冒険。</span><button id="help-open" class="quiet">遊び方 <span>?</span></button></header>
+<section class="heading"><div><p class="eyebrow">A WORD CAN CHANGE THE WORLD</p><h1>その一文字が、<em>道になる。</em></h1><p>漢字を置いて、世界のルールを書きかえよう。</p></div><div class="chapter-nav" id="chapters" aria-label="ステージ選択"></div></section>
+<div class="workspace">
+<section class="stage-panel" aria-label="ゲーム画面">
+<div class="stage-bar"><div><span class="stage-number" id="stage-number">第一景</span><strong id="stage-title">はじまりの橋</strong></div><span class="mode-tag" id="mode-tag">配置モード</span></div>
+<div class="canvas-wrap"><canvas id="world" width="1000" height="500" tabindex="0" aria-label="漢字を置くゲーム盤。配置中はクリック、実行中は左右キーとスペースで操作。"></canvas><div class="scene-label"><span id="scene-kicker">一文字から、はじまる旅。</span></div><div class="win-panel" id="win-panel" hidden><span>道は、つながった。</span><h2 id="win-title">第一景 クリア</h2><p id="win-detail"></p><button id="next-level" class="primary">次の景へ →</button><button id="replay" class="quiet">もう一度遊ぶ</button></div></div>
+<div class="stage-controls"><button id="play" class="primary">▶ 旅をはじめる</button><button id="retry" class="secondary">↺ スタートに戻る</button><button id="reset" class="quiet">配置を消す</button><span class="keys"><kbd>←</kbd><kbd>→</kbd> 移動 <kbd>Space</kbd> ジャンプ</span></div>
+<div class="touch-controls" aria-label="タッチ操作"><button data-control="left" aria-label="左に移動">←</button><button data-control="right" aria-label="右に移動">→</button><button data-control="jump">ジャンプ ↑</button></div>
+<p class="notice" id="notice" role="status" aria-live="polite">「木」を選んで、谷に足場をつくろう。</p>
 </section>
-<footer><span>遊び方</span><p>数字を左上から順番に並べ、右下を空けるとクリア。<br>タップ・クリック、または矢印キーで操作できます。</p><small>TAKE A BREATH. MAKE A MOVE.</small></footer>
+<aside class="ink-panel">
+<div class="ink-heading"><div><p class="eyebrow">YOUR WORDS, YOUR WAY</p><h2>ことばの筆箱</h2></div><span class="ink-count"><strong id="ink-left">6</strong><small>残りの墨</small></span></div>
+<form id="word-form"><label for="word">漢字を一文字、書いてみよう</label><div class="input-row"><input id="word" placeholder="例：木" autocomplete="off" spellcheck="false" aria-describedby="input-help"><button type="submit" aria-label="入力した漢字を選ぶ">選ぶ ↵</button></div><p id="input-help">日本語入力を確定してから「選ぶ」。</p></form>
+<div class="palette" id="palette" aria-label="使える漢字"></div>
+<div class="selected-rule"><span id="rule-symbol">木</span><div><strong id="rule-title">木は、足場になる。</strong><p id="rule-description">しっかり立てる足場。谷を渡る道をつくる。</p></div></div>
+<div class="hint-box"><span>この景のヒント</span><p id="level-hint"></p></div>
+<p class="placement-help">点線のマスをクリックして配置。<br>置いた文字をもう一度クリックで回収。<br>右クリックでも回収できます。</p>
+</aside>
+</div>
+<section class="bottom-notes"><div><span>01</span><p><strong>書く</strong>文字を入力、または筆箱から選ぶ。</p></div><div><span>02</span><p><strong>置く</strong>点線のマスに、あなたの道をつくる。</p></div><div><span>03</span><p><strong>歩く</strong>旅人を動かし、朱色の門を目指す。</p></div></section>
+<footer><span>Tohl / 言ノ葉の道</span><span>一文字の可能性を、探しにいこう。</span></footer>
 </main>
+<dialog id="help"><button id="help-close" class="dialog-close" aria-label="閉じる">×</button><p class="eyebrow">HOW TO PLAY</p><h2>漢字の意味が、世界を変える。</h2><p>漢字を選び、点線のマスをクリックして置きます。墨の数だけ配置できます。置いた文字はクリックで回収できます。</p><p>「旅をはじめる」を押して、<strong>← → / A D</strong> で移動、<strong>Space / ↑ / W</strong> でジャンプ。朱色の門にたどり着けばクリアです。</p><p>「配置に戻る」で一時停止して文字を置き直せます。落ちても配置は残ります。「スタートに戻る」で旅人だけを戻せます。</p><p>対応漢字は <strong>木・火・水・風・氷</strong> の5文字。筆箱の説明をヒントに、意味を組み合わせてみましょう。</p><button id="help-start" class="primary">道をつくる</button></dialog>
 </body></html>

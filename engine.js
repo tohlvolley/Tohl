@@ -4,10 +4,10 @@
   const WIDTH=1000,HEIGHT=500;
   const GRAVITY={軽:550,並:1050,重:1550};
   const LEVELS=[
-    {title:'一文字、ひとつのルール',chapter:'第一景',kicker:'文に書いた、その文字で渡る。',ruleKind:'jumps',word:'三',baseJumps:1,letter:[410,290,180],start:[65,420],goal:[925,420],hint:'空欄の文字が、そのまま一つの足場になる。画面をクリックして置き場所を変えよう。',regions:[{x:0,y:420,w:300,h:80},{x:700,y:420,w:300,h:80}]},
-    {title:'ことばの重さ',chapter:'第二景',kicker:'体と足場が、同じ文字で変わる。',ruleKind:'body',word:'軽',baseJumps:2,letter:[400,260,180],start:[55,430],goal:[935,240],hint:'体についての文を完成させる景。文字が体にどう働くかを考え、足場の形も活かそう。',regions:[{x:0,y:430,w:280,h:70},{x:700,y:240,w:300,h:260}]},
-    {title:'字形と動き',chapter:'第三景',kicker:'その意味と、その輪郭を使う。',ruleKind:'body',word:'速',baseJumps:2,letter:[420,260,200],start:[60,420],goal:[920,420],hint:'同じ文でも、別の漢字なら動きも字形も変わる。入力は自由。意味が成立するときだけ反映できる。',regions:[{x:0,y:420,w:240,h:80},{x:760,y:420,w:240,h:80}]},
-    {title:'一文字の可能性',chapter:'最終景',kicker:'ひとつの字で、道をひらく。',ruleKind:'jumps',word:'四',baseJumps:1,letter:[430,200,200],start:[50,430],goal:[930,180],hint:'置けるのは一文字だけ。跳べる回数と、文字の線のかたち。その両方を考えて高い門を目指そう。',regions:[{x:0,y:430,w:220,h:70},{x:780,y:180,w:220,h:320}]}
+    {title:'一文字、ひとつのルール',chapter:'第一景',kicker:'文に書いた、その文字で渡る。',ruleKind:'jumps',word:'三',baseJumps:1,letter:[410,290,180],start:[65,420],goal:[925,420],hint:'空欄の文字が、そのまま一つの足場になる。入力する場所は固定。ステージの文をクリックして漢字を変えよう。',regions:[{x:0,y:420,w:300,h:80},{x:700,y:420,w:300,h:80}]},
+    {title:'ことばの重さ',chapter:'第二景',kicker:'体と足場が、同じ文字で変わる。',ruleKind:'body',word:'軽',baseJumps:6,letter:[400,260,180],start:[55,430],goal:[935,240],hint:'体についての文を完成させる景。文字が体にどう働くかを考え、足場の形も活かそう。',regions:[{x:0,y:430,w:280,h:70},{x:700,y:240,w:300,h:260}]},
+    {title:'字形と動き',chapter:'第三景',kicker:'その意味と、その輪郭を使う。',ruleKind:'body',word:'速',baseJumps:6,letter:[420,260,200],start:[60,420],goal:[920,420],hint:'同じ文でも、別の漢字なら動きも字形も変わる。入力は自由。意味が成立するときだけ反映できる。',regions:[{x:0,y:420,w:240,h:80},{x:760,y:420,w:240,h:80}]},
+    {title:'一文字の可能性',chapter:'最終景',kicker:'ひとつの字で、道をひらく。',ruleKind:'jumps',word:'五',baseJumps:1,letter:[430,200,200],start:[50,430],goal:[930,180],hint:'置けるのは一文字だけ。跳べる回数と、文字の線のかたち。その両方を考えて高い門を目指そう。',regions:[{x:0,y:430,w:220,h:70},{x:780,y:180,w:220,h:320}]}
   ];
   const BODY_RULES={
     軽:{gravity:'軽',description:'重力が弱まり、ふわりと高く跳べる。'},
@@ -71,7 +71,7 @@
     if(kind==='jumps'){
       const count=parseNumber(word);
       if(count===null)return {ok:false,message:`「${word}回まで飛べる」は具体的な回数として解釈できないため、反映できません。`};
-      return {ok:true,word,jumpCount:count,sentence:`${word}回まで飛べる。`,description:`着地まで合計${count}回ジャンプできる。足場は「${word}」一文字。`};
+      return {ok:true,word,jumpCount:count,sentence:`このステージで${word}回まで飛べる。`,description:`このステージで合計${count}回ジャンプできる。着地しても回数は戻らない。足場は「${word}」一文字。`};
     }
     if(kind==='body'){
       if(!Object.prototype.hasOwnProperty.call(BODY_RULES,word))return {ok:false,message:`「体が${word}くなる」の意味をゲームに反映できません。文が成立し、体の変化を解釈できる漢字で入力してください。`};
@@ -96,10 +96,54 @@
     const p=mask.prefix,s=mask.width+1;
     return p[bottom*s+right]-p[top*s+right]-p[bottom*s+left]+p[top*s+left]>0;
   }
+  function validateStage(source,makeGlyph){
+    const fail=message=>({ok:false,message});
+    if(!source||typeof source!=='object'||Array.isArray(source))return fail('ステージのデータ形式が正しくありません。');
+    const finite=(n,min,max)=>Number.isInteger(n)&&n>=min&&n<=max;
+    if(typeof source.title!=='string'||!source.title.trim()||source.title.length>40)return fail('ステージ名は1〜40文字で入力してください。');
+    if(!['jumps','body'].includes(source.ruleKind))return fail('文章の型を選んでください。');
+    const rule=evaluateRule(source.ruleKind,source.word);
+    if(!rule.ok)return fail(rule.message);
+    const baseJumps=source.baseJumps===undefined?6:source.baseJumps;
+    if(!finite(baseJumps,0,999))return fail('基本ジャンプ回数は0〜999回で指定してください。');
+    if(!Array.isArray(source.regions)||source.regions.length<1||source.regions.length>60)return fail('地面は1〜60個の長方形で配置してください。');
+    const regions=[];
+    for(const r of source.regions){
+      if(!r||!finite(r.x,0,WIDTH-25)||!finite(r.y,60,HEIGHT-10)||!finite(r.w,25,WIDTH)||!finite(r.h,10,HEIGHT)||r.x+r.w>WIDTH||r.y+r.h>HEIGHT)return fail('地面が画面の外にはみ出しています。');
+      regions.push({x:r.x,y:r.y,w:r.w,h:r.h});
+    }
+    const point=(p,minX,maxX,minY)=>Array.isArray(p)&&p.length===2&&finite(p[0],minX,maxX)&&finite(p[1],minY,HEIGHT);
+    if(!point(source.start,0,WIDTH-34,75))return fail('スタート位置が画面の外です。');
+    if(!point(source.goal,25,WIDTH-25,100))return fail('ゴール位置が画面の外です。');
+    const w=rule.width||18,h=rule.height||30,[sx,sy]=source.start,[gx,gy]=source.goal;
+    if(!regions.some(r=>r.y===sy&&sx>=r.x&&sx+w<=r.x+r.w))return fail('スタートを地面の上端に置いてください。');
+    if(!regions.some(r=>r.y===gy&&gx-20>=r.x&&gx+20<=r.x+r.w))return fail('ゴールを地面の上端に置いてください。');
+    if(Math.hypot(gx-sx,gy-sy)<60)return fail('スタートとゴールを少し離してください。');
+    const overlaps=(a,b)=>intersects(a,b);
+    if(sy-h<35)return fail('スタートが画面の上端に近すぎます。少し下に置いてください。');
+    if(regions.some(r=>overlaps({x:sx,y:sy-h,w,h},r)))return fail('スタートが地面に埋まっています。');
+    if(regions.some(r=>overlaps({x:gx-18,y:gy-64,w:36,h:64},r)))return fail('ゴールが地面に埋まっています。');
+    const letter=source.letter;
+    if(!Array.isArray(letter)||letter.length!==3||!finite(letter[2],100,200)||!finite(letter[0],150,850-letter[2])||!finite(letter[1],60,HEIGHT-letter[2]-5))return fail('入力欄を文章も含めて画面に収まる場所に置いてください。');
+    if(makeGlyph){
+      let mask;try{mask=makeGlyph(rule.word,letter[2]);}catch{return fail('この漢字の字形を作れませんでした。');}
+      if(!mask||!mask.ink)return fail('この漢字の字形を表示できません。');
+      if(regions.some(r=>maskIntersects(mask,letter[0],letter[1],r))||maskIntersects(mask,letter[0],letter[1],{x:sx,y:sy-h,w,h})||maskIntersects(mask,letter[0],letter[1],{x:gx-18,y:gy-64,w:36,h:64}))return fail('入力欄の文字が地面・スタート・ゴールに重なっています。');
+    }
+    const level={title:source.title.trim(),chapter:'自作',kicker:'あなたがつくった、一文字の世界。',hint:'ステージ内の空欄を書きかえて、出口を目指そう。',ruleKind:source.ruleKind,word:rule.word,baseJumps,letter:[...letter],start:[sx,sy],goal:[gx,gy],regions};
+    return {ok:true,level};
+  }
   class Game{
     constructor(index=0,makeGlyph){this.makeGlyph=makeGlyph;this.load(index);}
     load(index){
-      this.index=index;this.level=LEVELS[index];this.placed=[];this.nextId=1;
+      this.initialize(index,LEVELS[index]);
+    }
+    loadCustom(source){
+      const result=validateStage(source,this.makeGlyph);if(!result.ok)return result;
+      this.initialize(-1,result.level);return result;
+    }
+    initialize(index,level){
+      this.index=index;this.level=JSON.parse(JSON.stringify(level));this.placed=[];this.nextId=1;
       this.running=false;this.won=false;this.deaths=0;this.elapsed=0;this.lastEvent='';
       this.word=this.level.word;this.rule=evaluateRule(this.level.ruleKind,this.word);
       this.rules=this.rulesFor(this.rule);this.respawn();
@@ -114,18 +158,17 @@
       const rule=evaluateRule(this.level.ruleKind,value);
       if(!rule.ok)return rule;
       if(!this.makeGlyph)return {ok:false,message:'文字の字体を準備しています。'};
-      const current=this.placed[0],position=current||{x:this.level.letter[0],y:this.level.letter[1]};
-      const letterSize=size===undefined?(current?current.size:this.level.letter[2]):size;
-      if(!Number.isInteger(letterSize)||letterSize<100||letterSize>200)return {ok:false,message:'文字の大きさは100〜200で指定してください。'};
+      if(rule.word===this.word)return {ok:true,changed:false,message:'この漢字はすでに反映されています。残り回数はそのままです。'};
+      const[x,y,letterSize]=this.level.letter;
+      if(size!==undefined&&size!==letterSize)return {ok:false,message:'入力欄の位置と大きさはステージで指定されています。'};
       const mask=this.makeGlyph(rule.word,letterSize),rules=this.rulesFor(rule);
       const spawn={x:this.level.start[0],y:this.level.start[1]-rules.height,w:rules.width,h:rules.height};
-      let x=position.x,y=position.y;
-      if(!this.positionFits(x,y,letterSize,mask,spawn)){[x,y]=this.level.letter;}
-      if(!this.positionFits(x,y,letterSize,mask,spawn))return {ok:false,message:'この大きさでは文字を安全に反映できません。文字を小さくして試してください。'};
+      if(spawn.y<35||this.level.regions.some(r=>intersects(spawn,r)))return {ok:false,message:'この体の大きさではスタートが地面や上端に重なるため反映できません。'};
+      if(!this.positionFits(x,y,letterSize,mask,spawn))return {ok:false,message:'この字形は地面やスタートに重なるため反映できません。'};
       // Commit the word, its rule and its sole glyph together after every validation passes.
       this.word=rule.word;this.rule=rule;this.rules=rules;
       this.placed=[{id:this.nextId++,char:rule.word,x,y,size:letterSize,mask}];this.respawn();
-      return {ok:true,message:`「${rule.sentence}」を反映しました。ステージの一文字も「${rule.word}」になりました。`};
+      return {ok:true,message:`「${rule.sentence}」を反映しました。スタートへ戻り、ステージの残り回数をリセットしました。`};
     }
     glyphAt(x,y){return [...this.placed].reverse().find(g=>x>=g.x&&x<g.x+g.size&&y>=g.y&&y<g.y+g.size);}
     positionFits(x,y,size,mask,player=this.player){
@@ -134,24 +177,6 @@
       for(const terrain of this.level.regions)if(maskIntersects(mask,x,y,terrain))return false;
       const[gx,gy]=this.level.goal;
       return !maskIntersects(mask,x,y,{x:gx-32,y:gy-75,w:64,h:75});
-    }
-    canPlace(x,y,size,mask){return !this.running&&!this.won&&this.positionFits(x,y,size,mask);}
-    moveLetter(x,y,size){
-      if(this.running||this.won)return {ok:false,message:'配置モードで文字の位置を変えてください。'};
-      const current=this.placed[0];if(!current)return {ok:false,message:'文を反映してから位置を変えてください。'};
-      const letterSize=size===undefined?current.size:size;
-      if(!Number.isInteger(letterSize)||letterSize<100||letterSize>200)return {ok:false,message:'文字の大きさは100〜200で指定してください。'};
-      const mask=this.makeGlyph(this.word,letterSize);
-      if(!this.canPlace(x,y,letterSize,mask))return {ok:false,message:'文字の線が地面・旅人・門に重ならない場所を選んでください。'};
-      this.placed=[{...current,x,y,size:letterSize,mask}];
-      return {ok:true,message:`「${this.word}」一文字の位置を変えました。ルールはそのままです。`};
-    }
-    resetLetter(){
-      if(this.running||this.won)return {ok:false,message:'配置モードで初期位置に戻してください。'};
-      const[x,y,size]=this.level.letter;
-      const oldPlayer=this.player;this.respawn();const result=this.moveLetter(x,y,size);
-      if(!result.ok)this.player=oldPlayer;
-      return result;
     }
     solidAt(rect){
       for(const region of this.level.regions)if(intersects(rect,region))return {type:'ground'};
@@ -172,7 +197,7 @@
         }
         p[axis]=before;
         if(axis==='y'){
-          if(delta>0){p.grounded=true;p.jumpsUsed=0;p.surface=collision.type==='glyph'?collision.glyph.char:'地';}
+          if(delta>0){p.grounded=true;p.surface=collision.type==='glyph'?collision.glyph.char:'地';}
           p.vy=0;
         }else p.vx=0;
         break;
@@ -195,6 +220,6 @@
       if(intersects(p,{x:gx-18,y:gy-64,w:36,h:64})){this.won=true;this.running=false;this.lastEvent='win';}
     }
   }
-  const api={Game,LEVELS,WIDTH,HEIGHT,GRAVITY,isHan,parseNumber,evaluateRule,buildMask,maskIntersects};
+  const api={Game,LEVELS,WIDTH,HEIGHT,GRAVITY,isHan,parseNumber,evaluateRule,validateStage,buildMask,maskIntersects};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Kotonoha=api;
 })(typeof window!=='undefined'?window:globalThis);

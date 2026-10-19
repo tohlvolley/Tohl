@@ -42,16 +42,15 @@ test('applying a word replaces both its effect and the sole glyph atomically',()
 });
 test('invalid glyph size, empty font mask and invalid placement never partially apply a rule',()=>{
  const g=game(),before=g.placed[0];assert.equal(g.applyRule('十',999).ok,false);assert.equal(g.placed[0],before);assert.equal(g.word,'三');
- g.makeGlyph=()=>buildMask(100,100,new Uint8Array(10000));assert.equal(g.applyRule('十',100).ok,false);assert.equal(g.word,'三');assert.equal(g.placed[0],before);
+ g.makeGlyph=()=>buildMask(100,100,new Uint8Array(10000));assert.equal(g.applyRule('十').ok,false);assert.equal(g.word,'三');assert.equal(g.placed[0],before);
 });
-test('moving and resizing never duplicates or changes the rule’s character',()=>{
- const g=game();assert(g.moveLetter(450,160,140).ok);assert(g.moveLetter(500,150,120).ok);assert.equal(g.placed.length,1);assert.equal(g.placed[0].char,'三');assert.equal(g.rules.jumpCount,3);
- const before=g.placed[0];assert.equal(g.moveLetter(-1,200).ok,false);assert.equal(g.placed[0],before);
- assert.equal(typeof g.place,'undefined');assert(g.resetLetter().ok);assert.equal(g.placed.length,1);assert.equal(g.word,'三');
+test('the sentence input has a fixed stage position, even after changing its glyph',()=>{
+ const g=game(),[x,y,size]=g.level.letter;assert.equal(typeof g.moveLetter,'undefined');assert.equal(typeof g.resetLetter,'undefined');
+ assert(g.applyRule('十').ok);assert.equal(g.placed.length,1);assert.equal(g.placed[0].x,x);assert.equal(g.placed[0].y,y);assert.equal(g.placed[0].size,size);
 });
 test('sentence and glyph are locked together during play or after winning',()=>{
- const g=game();g.running=true;assert.equal(g.applyRule('十').ok,false);assert.equal(g.moveLetter(400,150).ok,false);assert.equal(g.word,'三');
- g.running=false;g.won=true;assert.equal(g.applyRule('百').ok,false);assert.equal(g.moveLetter(400,150).ok,false);
+ const g=game();g.running=true;assert.equal(g.applyRule('十').ok,false);assert.equal(g.word,'三');
+ g.running=false;g.won=true;assert.equal(g.applyRule('百').ok,false);
 });
 test('collision follows actual pixels and leaves the interior empty',()=>{
  const mask=glyph('口',100);assert.equal(maskIntersects(mask,200,100,{x:230,y:130,w:18,h:30}),false);assert(maskIntersects(mask,200,100,{x:230,y:105,w:18,h:10}));
@@ -71,8 +70,8 @@ test('三 allows exactly three presses before landing; holding does not repeat',
  const g=game();g.player.x=650;g.player.y=180;g.running=true;tap(g);assert.equal(g.player.jumpsUsed,1);tick(g,{jump:true},20);assert.equal(g.player.jumpsUsed,2);
  tick(g,{});tap(g);assert.equal(g.player.jumpsUsed,3);tick(g,{},10);const before=g.player.vy;tap(g);assert.equal(g.player.jumpsUsed,3);assert(g.player.vy>before);
 });
-test('landing restores jumps, and 零 prevents jumping while remaining the sole glyph',()=>{
- const g=withGeometry('一');g.player.x=385;g.player.y=200;g.player.jumpsUsed=3;g.running=true;tick(g,{},80);assert.equal(g.jumpsLeft,3);
+test('landing never restores the stage budget, and 零 prevents every jump',()=>{
+ const g=withGeometry('一');g.player.x=385;g.player.y=200;g.player.jumpsUsed=3;g.running=true;tick(g,{},80);assert.equal(g.jumpsLeft,0);assert(g.player.grounded);
  g.running=false;assert(g.applyRule('零').ok);assert.equal(g.placed[0].char,'零');g.running=true;tick(g,{},5);const before=g.player.y;tap(g);assert.equal(g.player.jumpsUsed,0);assert(g.player.y>=before-.1);
 });
 test('body rules affect actual movement, gravity, size and color as well as the glyph',()=>{
@@ -88,4 +87,24 @@ test('pause, death and retry preserve the one-word rule and glyph',()=>{
 });
 test('goal contact emits a win and stops play',()=>{
  const g=game();g.player.x=920;g.player.y=380;g.running=true;tick(g);assert(g.won);assert.equal(g.lastEvent,'win');assert.equal(g.running,false);
+});
+
+test('two jumps separated by a landing still consume two stage jumps',()=>{
+ const g=game();g.running=true;tap(g);tick(g,{},120);assert(g.player.grounded);assert.equal(g.jumpsLeft,2);
+ tap(g);tick(g,{},120);assert(g.player.grounded);assert.equal(g.jumpsLeft,1);
+ tap(g);tick(g,{},120);assert.equal(g.jumpsLeft,0);const before=g.player.y;tap(g);assert(g.player.y>=before-.1);assert.equal(g.jumpsLeft,0);
+});
+test('changing a kanji resets the traveler and budget; reaffirming it does not',()=>{
+ const g=game();g.player.x=400;g.player.y=150;g.player.jumpsUsed=2;assert(g.applyRule('十').ok);
+ assert.equal(g.player.x,g.level.start[0]);assert.equal(g.player.y,g.level.start[1]-g.player.h);assert.equal(g.jumpsLeft,10);
+ g.player.x=450;g.player.jumpsUsed=3;assert(g.applyRule('十').ok);assert.equal(g.player.x,450);assert.equal(g.jumpsLeft,7);
+ const snapshot={...g.player};assert.equal(g.applyRule('猫').ok,false);assert.deepEqual(g.player,snapshot);
+});
+test('retry and a new attempt refill the stage budget',()=>{
+ const g=game();g.player.jumpsUsed=3;g.respawn();assert.equal(g.jumpsLeft,3);g.player.jumpsUsed=2;g.player.x=650;g.player.y=558;g.player.vy=650;g.running=true;tick(g,{},3);assert.equal(g.jumpsLeft,3);assert.equal(g.deaths,1);
+});
+test('sentence text outside the glyph is never a physical platform',()=>{
+ const g=game(),[x,y,size]=g.level.letter;
+ assert.equal(g.solidAt({x:x-80,y:y+size/2,w:15,h:15}),null);
+ assert.equal(g.solidAt({x:x+size+15,y:y+size/2,w:15,h:15}),null);
 });

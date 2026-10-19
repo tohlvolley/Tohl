@@ -1,25 +1,31 @@
 'use strict';
-const {Game,LEVELS,WIDTH,HEIGHT,isHan,parseNumber,buildMask}=window.Kotonoha;
+const {Game,LEVELS,WIDTH,HEIGHT,evaluateRule,buildMask}=window.Kotonoha;
 const $=selector=>document.querySelector(selector);
 const canvas=$('#world'),ctx=canvas.getContext('2d');
-let game,selected='山',letterSize=160,hover=null,clock=0,previous=0,accumulator=0,composition=false,jumpQueued=false,completed=new Set();
+let game,letterSize=180,hover=null,clock=0,previous=0,accumulator=0,composition=false,jumpQueued=false,completed=new Set();
 const input={left:false,right:false,jump:false},glyphCache=new Map();
 let glyphFont='"Kotonoha Thin","Hiragino Sans","Noto Sans CJK JP",sans-serif';
-try{const saved=JSON.parse(localStorage.getItem('kotonoha-glyph-completed')||'[]');if(Array.isArray(saved))completed=new Set(saved.filter(n=>Number.isInteger(n)&&n>=0&&n<LEVELS.length));}catch{}
+try{const saved=JSON.parse(localStorage.getItem('kotonoha-one-rule-completed')||'[]');if(Array.isArray(saved))completed=new Set(saved.filter(n=>Number.isInteger(n)&&n>=0&&n<LEVELS.length));}catch{}
 function tell(message,error=false){$('#notice').textContent=message;$('#notice').classList.toggle('error',error);}
 function clearInput(){jumpQueued=false;input.left=false;input.right=false;input.jump=false;}
 function makeGlyph(char,size){
-  const key=`${char}:${size}`;
-  if(glyphCache.has(key))return glyphCache.get(key);
-  const surface=document.createElement('canvas');surface.width=size;surface.height=size;
-  const ink=surface.getContext('2d',{willReadFrequently:true});
-  ink.font=`100 ${size*.9}px ${glyphFont}`;ink.textAlign='center';ink.textBaseline='alphabetic';ink.fillStyle='#3f5542';
+  const key=`${char}:${size}`;if(glyphCache.has(key))return glyphCache.get(key);
+  // Rasterize the thin font into a 32-dot grid, then scale with nearest-neighbor.
+  // The visible pixel sprite itself supplies the collision mask.
+  const dots=32,small=document.createElement('canvas');small.width=dots;small.height=dots;
+  const ink=small.getContext('2d',{willReadFrequently:true});
+  ink.font=`100 ${dots*.9}px ${glyphFont}`;ink.textAlign='center';ink.textBaseline='alphabetic';ink.fillStyle='#8bf6cb';
   const metrics=ink.measureText(char);
-  const ascent=Number.isFinite(metrics.actualBoundingBoxAscent)?metrics.actualBoundingBoxAscent:size*.75;
-  const descent=Number.isFinite(metrics.actualBoundingBoxDescent)?metrics.actualBoundingBoxDescent:size*.05;
+  const ascent=Number.isFinite(metrics.actualBoundingBoxAscent)?metrics.actualBoundingBoxAscent:dots*.75;
+  const descent=Number.isFinite(metrics.actualBoundingBoxDescent)?metrics.actualBoundingBoxDescent:dots*.05;
   const offset=Number.isFinite(metrics.actualBoundingBoxLeft)?(metrics.actualBoundingBoxLeft-metrics.actualBoundingBoxRight)/2:0;
-  ink.fillText(char,size/2+offset,(size+ascent-descent)/2);
-  const data=ink.getImageData(0,0,size,size).data,alpha=new Uint8Array(size*size);
+  ink.fillText(char,dots/2+offset,(dots+ascent-descent)/2);
+  const pixels=ink.getImageData(0,0,dots,dots);
+  for(let i=0;i<pixels.data.length;i+=4){pixels.data[i]=139;pixels.data[i+1]=246;pixels.data[i+2]=203;pixels.data[i+3]=pixels.data[i+3]>=48?255:0;}
+  ink.putImageData(pixels,0,0);
+  const surface=document.createElement('canvas');surface.width=size;surface.height=size;
+  const scaled=surface.getContext('2d',{willReadFrequently:true});scaled.imageSmoothingEnabled=false;scaled.drawImage(small,0,0,size,size);
+  const data=scaled.getImageData(0,0,size,size).data,alpha=new Uint8Array(size*size);
   for(let i=0;i<alpha.length;i++)alpha[i]=data[i*4+3];
   const mask=buildMask(size,size,alpha);mask.canvas=surface;
   if(glyphCache.size>=128)glyphCache.delete(glyphCache.keys().next().value);
@@ -30,56 +36,62 @@ function updateJumpCounter(){
   const text=`残り ${game.jumpsLeft} / ${game.rules.jumpCount} 回`;
   if($('#jump-counter').textContent!==text)$('#jump-counter').textContent=text;
 }
+function validateDraft(){
+  const field=$('#rule-word'),note=$('#rule-validation');
+  const result=evaluateRule(game.level.ruleKind,field.value);
+  field.setAttribute('aria-invalid',String(!composition&&!result.ok));note.classList.toggle('error',!composition&&!result.ok);
+  if(composition)note.textContent='変換を確定してから反映できます。';
+  else if(!result.ok)note.textContent=result.message;
+  else note.textContent=result.word===game.word?'適用中：文とステージの一文字は連動しています。':'文の意味を解釈できました。反映すると、足場もこの一文字に置き換わります。';
+  $('#apply-rules').disabled=composition||!result.ok||game.running||game.won;
+  return result;
+}
 function updateUI(){
   const level=game.level;
   $('#stage-number').textContent=level.chapter;$('#stage-title').textContent=level.title;
-  $('#scene-kicker').textContent=level.kicker;$('#ink-left').textContent=game.remaining;$('#level-hint').textContent=level.hint;
-  $('#mode-tag').textContent=game.won?'クリア':game.running?'旅の途中':'配置モード';
+  $('#scene-kicker').textContent=level.kicker;$('#level-hint').textContent=level.hint;
+  $('#mode-tag').textContent=game.won?'CLEAR':game.running?'RUNNING':'EDIT MODE';
   $('#play').textContent=game.running?'Ⅱ 配置に戻る':'▶ 旅をはじめる';$('#play').disabled=game.won;
-  for(const id of ['#reset','#apply-rules','#word-form button'])$(id).disabled=game.running||game.won;
+  $('#reset').disabled=game.running||game.won;$('#letter-size').disabled=game.running||game.won;
   $('#retry').disabled=game.won;$('#win-panel').hidden=!game.won;
+  $('#glyph-count').textContent=`${game.placed.length} / 1`;
+  $('#applied-sentence').textContent=game.rule.sentence;
+  $('#rule-effect').textContent=game.rule.description+(level.ruleKind==='body'?` この景は着地まで${game.rules.jumpCount}回ジャンプ。`:'');
+  $('#rule-symbol').textContent=game.word;
+  const preview=$('#letter-preview'),pctx=preview.getContext('2d');pctx.clearRect(0,0,preview.width,preview.height);pctx.imageSmoothingEnabled=false;
+  if(game.placed[0])pctx.drawImage(game.placed[0].mask.canvas,0,0,preview.width,preview.height);
   document.querySelectorAll('.chapter').forEach((b,i)=>{b.classList.toggle('active',i===game.index);b.classList.toggle('complete',completed.has(i));b.setAttribute('aria-current',i===game.index?'step':'false');});
-  updateJumpCounter();
-}
-function showAppliedRules(){
-  $('#rule-summary').textContent=`適用中：${game.rules.jumpCount}回・重力「${game.rules.gravity}」`;
-  $('#rules-form').classList.remove('pending');
+  validateDraft();updateJumpCounter();
 }
 function loadLevel(index){
-  clearInput();game.load(index);hover=null;$('#jump-rule').value=game.level.jumps;$('#gravity-rule').value=game.level.gravity;
-  showAppliedRules();updateUI();tell(game.level.hint);
-}
-function selectWord(char){
-  if(!isHan(char)){tell('好きな漢字を一文字入力してください。例：夢、橋、猫、龍。',true);return;}
-  const mask=makeGlyph(char,letterSize);
-  if(!mask.ink){tell('この漢字を表示できませんでした。別の漢字を試してください。',true);return;}
-  selected=char;$('#word').value=char;$('#rule-symbol').textContent=char;$('#rule-title').textContent=`「${char}」の線に乗る。`;
-  document.querySelectorAll('.word-card').forEach(b=>{b.classList.toggle('selected',b.dataset.word===char);b.setAttribute('aria-pressed',String(b.dataset.word===char));});
-  tell(`「${char}」を選びました。画面をクリックすると、その線が足場になります。`);
+  clearInput();game.load(index);hover=null;
+  $('#rule-word').value=game.word;$('#rule-prefix').textContent=game.level.ruleKind==='body'?'体が':'';$('#rule-suffix').textContent=game.level.ruleKind==='body'?'くなる。':'回まで飛べる。';
+  letterSize=game.placed[0].size;$('#letter-size').value=letterSize;$('#size-value').textContent=letterSize;
+  updateUI();tell(game.level.hint);
 }
 function pointerPosition(event){const r=canvas.getBoundingClientRect();return {x:(event.clientX-r.left)/r.width*WIDTH,y:(event.clientY-r.top)/r.height*HEIGHT};}
 function placementPosition(point){return {x:Math.round((point.x-letterSize/2)/10)*10,y:Math.round((point.y-letterSize/2)/10)*10};}
 function setupControls(){
-  for(const char of ['一','二','山','川','回']){
-    const button=document.createElement('button');button.className='word-card';button.type='button';button.dataset.word=char;
-    const symbol=document.createElement('strong');symbol.textContent=char;button.append(symbol);button.title=`「${char}」の形を置く`;
-    button.addEventListener('click',()=>selectWord(char));$('#palette').append(button);
-  }
   LEVELS.forEach((level,index)=>{
     const button=document.createElement('button');button.className='chapter';button.textContent=['一','二','三','四'][index];button.title=`${level.chapter}：${level.title}`;button.setAttribute('aria-label',button.title);
     button.addEventListener('click',()=>loadLevel(index));$('#chapters').append(button);
   });
-  for(const field of document.querySelectorAll('input:not([type="range"])')){
-    field.addEventListener('compositionstart',()=>composition=true);field.addEventListener('compositionend',()=>composition=false);
-    field.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.isComposing||composition||e.keyCode===229))e.preventDefault();});
-  }
-  $('#word-form').addEventListener('submit',e=>{e.preventDefault();if(!composition)selectWord($('#word').value.trim());});
-  $('#letter-size').addEventListener('input',()=>{letterSize=Number($('#letter-size').value);$('#size-value').textContent=letterSize;});
-  $('#rules-form').addEventListener('input',()=>{const n=parseNumber($('#jump-rule').value);$('#rules-form').classList.add('pending');$('#rule-summary').textContent=n===null?'未反映：回数には漢数字を入力してください。':`未反映：${n}回・重力「${$('#gravity-rule').value.trim()}」` ;});
+  const field=$('#rule-word');
+  field.addEventListener('compositionstart',()=>{composition=true;validateDraft();});
+  field.addEventListener('compositionend',()=>{composition=false;validateDraft();});
+  field.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.isComposing||composition||e.keyCode===229))e.preventDefault();});
+  field.addEventListener('input',validateDraft);
+  $('#letter-size').addEventListener('input',()=>{
+    const current=game.placed[0],size=Number($('#letter-size').value),result=game.moveLetter(current.x,current.y,size);
+    if(result.ok)letterSize=size;else tell(result.message,true);
+    $('#letter-size').value=letterSize;$('#size-value').textContent=letterSize;updateUI();
+  });
   $('#rules-form').addEventListener('submit',e=>{
     e.preventDefault();if(composition)return;
-    const result=game.setRules($('#jump-rule').value.trim(),$('#gravity-rule').value.trim());
-    if(result.ok){clearInput();showAppliedRules();updateUI();}tell(result.message,!result.ok);
+    const result=game.applyRule($('#rule-word').value,letterSize);
+    if(result.ok){clearInput();$('#rule-word').value=game.word;updateUI();}
+    else validateDraft();
+    tell(result.message,!result.ok);
   });
   $('#play').addEventListener('click',()=>{
     if(game.won)return;game.running=!game.running;clearInput();updateUI();
@@ -87,20 +99,17 @@ function setupControls(){
     if(game.running)canvas.focus({preventScroll:true});
   });
   $('#retry').addEventListener('click',()=>{game.respawn();game.running=false;clearInput();updateUI();tell('旅人を戻しました。文字の配置とルールは残っています。');});
-  $('#reset').addEventListener('click',()=>{game.clear();clearInput();updateUI();tell('文字をすべて回収しました。ルールはそのままです。');});
+  $('#reset').addEventListener('click',()=>{const result=game.resetLetter();clearInput();letterSize=game.placed[0].size;$('#letter-size').value=letterSize;$('#size-value').textContent=letterSize;updateUI();tell(result.ok?'一文字を初期位置に戻しました。文とルールはそのままです。':result.message,!result.ok);});
   $('#next-level').addEventListener('click',()=>loadLevel((game.index+1)%LEVELS.length));$('#replay').addEventListener('click',()=>loadLevel(game.index));
   canvas.addEventListener('pointermove',e=>hover=pointerPosition(e));canvas.addEventListener('pointerleave',()=>hover=null);
   canvas.addEventListener('pointerdown',e=>{
     if(e.button!==0)return;
     if(game.running){tell('文字を置くには「配置に戻る」を押してください。');return;}
     if(game.won)return;
-    const point=pointerPosition(e),existing=game.glyphAt(point.x,point.y);
-    if(existing){game.remove(existing.id);tell(`「${existing.char}」を回収しました。`);}else{
-      const{x,y}=placementPosition(point),result=game.place(x,y,selected,letterSize);tell(result.message,!result.ok);
-    }
-    updateUI();
+    const point=pointerPosition(e),{x,y}=placementPosition(point),result=game.moveLetter(x,y,letterSize);
+    tell(result.message,!result.ok);updateUI();
   });
-  canvas.addEventListener('contextmenu',e=>{e.preventDefault();const point=pointerPosition(e),glyph=game.glyphAt(point.x,point.y);if(glyph&&game.remove(glyph.id)){tell(`「${glyph.char}」を回収しました。`);updateUI();}});
+  canvas.addEventListener('contextmenu',e=>e.preventDefault());
   const keyControls={ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right',ArrowUp:'jump',w:'jump',W:'jump',' ':'jump'};
   document.addEventListener('keydown',e=>{
     if(e.target.matches('input,textarea,select')||e.isComposing||$('#help').open)return;
@@ -124,65 +133,63 @@ function rect(x,y,w,h,fill,r=0){
 }
 function line(x1,y1,x2,y2,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();}
 function text(value,x,y,size,color,font='serif'){ctx.font=`${size}px ${font}`;ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(value,x,y);}
-function mountain(points,color){ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(0,500);for(const [x,y] of points)ctx.lineTo(x,y);ctx.lineTo(1000,500);ctx.closePath();ctx.fill();}
 function drawBackground(){
-  const gradient=ctx.createLinearGradient(0,0,0,500);gradient.addColorStop(0,'#eaf0e4');gradient.addColorStop(1,'#d9e3cc');ctx.fillStyle=gradient;ctx.fillRect(0,0,1000,500);
-  ctx.fillStyle='#f5efd6';ctx.beginPath();ctx.arc(780,95,39,0,Math.PI*2);ctx.fill();
-  mountain([[0,295],[100,220],[210,270],[340,150],[500,275],[650,190],[820,250],[1000,140]],'#c8d5c13d');
-  mountain([[0,340],[120,290],[230,315],[420,235],[580,325],[780,235],[1000,290]],'#b7c9ac55');
-  mountain([[0,410],[170,375],[330,390],[480,310],[680,380],[840,310],[1000,360]],'#a4bb9755');
-  ctx.strokeStyle='#fff9';ctx.lineWidth=1;
-  for(let i=0;i<8;i++){let x=((clock*(5+i%3)+i*147)%1100)-50,y=130+(i*47)%260;ctx.beginPath();ctx.moveTo(x,y);ctx.bezierCurveTo(x+20,y-7,x+45,y+6,x+65,y-2);ctx.stroke();}
-  // Distant brush-like pines, drawn as scenery rather than gameplay geometry.
-  for(const [x,y,s] of [[55,370,.9],[950,355,1.2],[885,360,.65]]){ctx.save();ctx.translate(x,y);ctx.scale(s,s);line(0,0,0,-75,'#8da48255',3);for(let i=0;i<5;i++){const w=28-i*4,h=-12-i*12;line(-w,h,0,h-14,'#8da48255',5);line(0,h-14,w,h,'#8da48255',5);}ctx.restore();}
+  rect(0,0,1000,500,'#101d31');
+  for(let x=0;x<1000;x+=25)line(x,0,x,500,'#20374e45');
+  for(let y=0;y<500;y+=25)line(0,y,1000,y,'#20374e45');
+  for(let i=0;i<36;i++){const x=(i*137+17)%1000,y=(i*71+51)%270;rect(x,y,i%5===0?3:2,i%5===0?3:2,i%5===0?'#7badc7':'#42647e');}
+  // Stepped silhouettes and a square moon keep the scenery on the pixel grid.
+  rect(800,55,48,48,'#324d67');rect(809,55,39,39,'#a5d5d3');rect(800,64,39,39,'#c4e6d8');
+  for(let i=0;i<19;i++){const x=i*60-40,h=35+(i*47)%115;rect(x,500-h-80,56,h+80,'#172c42');rect(x+8,500-h-92,30,12,'#172c42');}
+  for(let i=0;i<13;i++){const x=i*86-20,h=30+(i*31)%80;rect(x,500-h-35,74,h+35,'#1c3549');rect(x+14,500-h-45,32,10,'#1c3549');}
+  line(0,475,1000,475,'#2e6b7950');
 }
 function drawPlayer(){
-  const p=game.player,cx=p.x+p.w/2,cy=p.y,walk=game.running&&Math.abs(p.vx)>10&&p.grounded?Math.sin(clock*15)*4:0;
-  ctx.save();ctx.translate(cx,cy);ctx.scale(.8,.8);
-  ctx.fillStyle='#34483533';ctx.beginPath();ctx.ellipse(0,37,13,3,0,0,Math.PI*2);ctx.fill();
-  line(-5,27,-6+walk,35,'#475347',4);line(5,27,6-walk,35,'#475347',4);
-  rect(-10,12,20,17,'#ece5cf',4);rect(-9,20,18,4,'#9b654a',1);
-  // A red scarf makes the traveler legible against the landscape.
-  rect(-10,11,21,5,'#b65f45',2);const tail=-p.facing;ctx.fillStyle='#b65f45';ctx.beginPath();ctx.moveTo(tail*6,12);ctx.lineTo(tail*(24+Math.sin(clock*5)*3),9);ctx.lineTo(tail*23,17);ctx.closePath();ctx.fill();
-  ctx.fillStyle='#f0d8b1';ctx.beginPath();ctx.arc(0,6,9,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#465043';ctx.beginPath();ctx.arc(0,3,9,Math.PI,Math.PI*2);ctx.fill();rect(-9,0,4,7,'#465043',1);
-  ctx.fillStyle='#41493c';ctx.beginPath();ctx.arc(p.facing*4,6,1.3,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#c8b58c';ctx.beginPath();ctx.ellipse(0,-1,16,3,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.moveTo(-12,-1);ctx.lineTo(0,-9);ctx.lineTo(12,-1);ctx.closePath();ctx.fill();
+  const p=game.player,x=Math.round(p.x),y=Math.round(p.y),w=p.w,h=p.h;
+  const walk=game.running&&Math.abs(p.vx)>10&&p.grounded?Math.floor(clock*10)%2:0;
+  ctx.save();ctx.globalAlpha=game.rules.opacity;
+  const unit=Math.max(2,Math.round(w/6)),head=Math.round(h*.32),bodyY=y+head;
+  rect(x,y,w,head,'#d9ebc5');rect(x+unit,y-unit,w-unit*2,unit*2,'#2f6470');
+  rect(x+(p.facing>0?w-unit*2:unit),y+unit,unit,unit,'#142b3b');
+  if(game.rules.round){rect(x+unit,bodyY,w-unit*2,h-head-unit*2,game.rules.color);rect(x,bodyY+unit,w,h-head-unit*4,game.rules.color);}
+  else rect(x,bodyY,w,h-head-unit*2,game.rules.color);
+  rect(x,bodyY,w,unit,'#ff946e');rect(p.facing>0?x-unit*3:x+w,bodyY+unit,unit*3,unit,'#ff946e');
+  rect(x+unit, y+h-unit*(walk?2:1),unit*2,unit*(walk?2:1),'#668bac');
+  rect(x+w-unit*3,y+h-unit*(walk?1:2),unit*2,unit*(walk?1:2),'#668bac');
   ctx.restore();
 }
 function drawGround(){
   for(const r of game.level.regions){
-    const g=ctx.createLinearGradient(0,r.y,0,500);g.addColorStop(0,'#7d8f6e');g.addColorStop(1,'#697e61');rect(r.x,r.y,r.w,r.h,g);
-    rect(r.x,r.y,r.w,4,'#a6b98a');
-    for(let x=r.x+5;x<r.x+r.w;x+=15)line(x,r.y+2,x-2,r.y-3-(x%7),'#91a978',1.5);
-    for(let x=r.x+20;x<r.x+r.w;x+=45)for(let y=r.y+20;y<500;y+=35)line(x,y,x+13,y+3,'#d4dec220');
+    rect(r.x,r.y,r.w,r.h,'#193c45');rect(r.x,r.y,r.w,4,'#74c7af');rect(r.x,r.y+4,r.w,5,'#315f5a');
+    for(let x=r.x+4;x<r.x+r.w;x+=20){rect(x,r.y+12,12,3,'#2e5b60');for(let y=r.y+27;y<r.y+r.h;y+=22)rect(x+4,y,4,4,'#244b54');}
+    line(r.x,r.y+1,r.x+r.w,r.y+1,'#a0ffe2');
   }
 }
 function drawGoal(){
-  const[px,py]=game.level.goal;
-  ctx.save();ctx.shadowColor='#f3dba0';ctx.shadowBlur=20;rect(px-22,py-66,44,66,'#f7f1c377',15);ctx.restore();
-  rect(px-24,py-66,6,66,'#b26348',1);rect(px+18,py-66,6,66,'#b26348',1);rect(px-34,py-72,68,7,'#ad553e',2);rect(px-29,py-59,58,5,'#c77e55',1);rect(px-25,py-9,9,9,'#8a8565',1);rect(px+16,py-9,9,9,'#8a8565',1);
-  text('終',px,py-38,17,'#a36143');text('GOAL',px,py+15,8,'#f1f0d9','sans-serif');
+  const[px,py]=game.level.goal,blink=Math.floor(clock*3)%2;
+  rect(px-25,py-70,50,70,'#19394b');rect(px-25,py-70,5,70,'#66d7e0');rect(px+20,py-70,5,70,'#66d7e0');rect(px-25,py-70,50,5,'#a6f4ed');
+  for(let y=py-59;y<py-6;y+=8)rect(px-15,y,30,2,'#4d9aa54d');
+  rect(px-9,py-43,18,6,blink?'#9affcf':'#6ac09d');rect(px+3,py-49,6,18,blink?'#9affcf':'#6ac09d');
+  text('EXIT',px,py-85,10,'#83d4d7','PixelJP,monospace');
 }
 function draw(){
   if(!game)return;drawBackground();drawGround();
   for(const glyph of game.placed)ctx.drawImage(glyph.mask.canvas,glyph.x,glyph.y);
   if(!game.running&&!game.won){
-    const[sx,sy]=game.level.start;text('START',sx+8,sy+15,8,'#ecedde','sans-serif');
+    const[sx,sy]=game.level.start;text('START',sx+8,sy+15,8,'#8eafc0','PixelJP,monospace');
     if(hover){
-      const existing=game.glyphAt(hover.x,hover.y);
-      if(existing){ctx.save();ctx.setLineDash([3,5]);ctx.strokeStyle='#a1664d77';ctx.strokeRect(existing.x-4,existing.y-4,existing.size+8,existing.size+8);text('クリックで回収',existing.x+existing.size/2,existing.y-12,10,'#9c6d53','sans-serif');ctx.restore();}
-      else{const{x,y}=placementPosition(hover),mask=makeGlyph(selected,letterSize),allowed=game.canPlace(x,y,letterSize,mask)&&game.remaining>0;ctx.save();ctx.globalAlpha=allowed?.45:.18;ctx.drawImage(mask.canvas,x,y);ctx.setLineDash([2,5]);ctx.strokeStyle=allowed?'#718664':'#b0654c';ctx.strokeRect(x,y,letterSize,letterSize);ctx.restore();}
+      const{x,y}=placementPosition(hover),mask=makeGlyph(game.word,letterSize),allowed=game.canPlace(x,y,letterSize,mask);
+      ctx.save();ctx.globalAlpha=allowed?.6:.35;ctx.setLineDash([3,5]);ctx.strokeStyle=allowed?'#8bf6cb':'#ff9d87';ctx.strokeRect(x,y,letterSize,letterSize);ctx.restore();
     }
   }
   drawGoal();drawPlayer();
-  for(let i=0;i<5;i++){const x=(i*237+clock*(9+i))%1040-20,y=(i*97+Math.sin(clock*.3+i)*12)%430;ctx.save();ctx.translate(x,y);ctx.rotate(clock*.5+i);ctx.fillStyle='#a8b38d66';ctx.beginPath();ctx.ellipse(0,0,4,1.6,0,0,Math.PI*2);ctx.fill();ctx.restore();}
+
 }
 function onWin(){
-  clearInput();completed.add(game.index);try{localStorage.setItem('kotonoha-glyph-completed',JSON.stringify([...completed]));}catch{}
+  clearInput();completed.add(game.index);try{localStorage.setItem('kotonoha-one-rule-completed',JSON.stringify([...completed]));}catch{}
   $('#win-title').textContent=`${game.level.chapter} クリア`;
-  $('#win-detail').textContent=`${game.placed.length}文字の道 · ${Math.ceil(game.elapsed)}秒 · ${game.rules.jumpCount}回ジャンプのルール`;
-  $('#next-level').textContent=game.index===LEVELS.length-1?'最初の景へ戻る ↺':'次の景へ →';updateUI();tell('あなたの文字が、道になりました。別の漢字やルールでも試してみよう。');
+  $('#win-detail').textContent=`一文字「${game.word}」 · ${Math.ceil(game.elapsed)}秒 · ${game.rule.sentence}`;
+  $('#next-level').textContent=game.index===LEVELS.length-1?'最初の景へ戻る ↺':'次の景へ →';updateUI();tell('あなたの文字が、道になりました。別の一文字でも、この文を試してみよう。');
 }
 function frame(timestamp){
   const delta=Math.min((timestamp-previous)/1000||0,.05);previous=timestamp;clock+=delta;accumulator+=delta;
@@ -194,8 +201,9 @@ async function bootstrap(){
   document.documentElement.setAttribute('data-game-loading','');
   let fontLoaded=false;
   try{const loaded=await document.fonts.load('100 144px "Kotonoha Thin"','漢字');fontLoaded=loaded.length>0;}catch{}
+  try{await document.fonts.load('16px PixelJP','漢字');}catch{}
   if(!fontLoaded)glyphFont='"Hiragino Sans","Noto Sans CJK JP",sans-serif';
-  game=new Game(0,makeGlyph);setupControls();loadLevel(0);selectWord(selected);tell(fontLoaded?game.level.hint:'細字フォントを取得できなかったため、端末の字体で遊べます。線と当たり判定には同じ字形を使っています。');
-  $('#font-loading').hidden=true;draw();document.documentElement.removeAttribute('data-game-loading');document.documentElement.setAttribute('data-game-ready','');requestAnimationFrame(frame);
+  game=new Game(0,makeGlyph);setupControls();loadLevel(0);tell(fontLoaded?game.level.hint:'細字フォントを取得できなかったため、端末の字体で遊べます。線と当たり判定には同じ字形を使っています。');
+  $('#font-loading').hidden=true;ctx.imageSmoothingEnabled=false;draw();document.documentElement.removeAttribute('data-game-loading');document.documentElement.setAttribute('data-game-ready','');requestAnimationFrame(frame);
 }
 bootstrap().catch(error=>{console.error(error);$('#font-loading').hidden=true;document.documentElement.removeAttribute('data-game-loading');tell('文字の準備に失敗しました。ページを再読み込みしてください。',true);});

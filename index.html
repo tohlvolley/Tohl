@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tohl — スライドパズル</title>
+<link rel="stylesheet" href="style.css">
+<script src="game.js" defer></script>
+</head>
+<body>
+<main>
+<header><a class="brand" href="./">Tohl<span>PLAY ROOM</span></a><span class="edition">01 / SLIDE PUZZLE</span></header>
+<section class="intro"><p class="eyebrow">ひとつずつ、整う心地よさ。</p><h1>小さなひらめき、<br>大きな達成感。</h1><p class="description">空いたマスへタイルを動かして、数字を順番に。<br>あせらず、自分のペースで楽しもう。</p></section>
+<section class="game" aria-label="スライドパズル">
+<div class="toolbar"><label>難易度 <select id="size"><option value="3">3 × 3 · やさしい</option><option value="4">4 × 4 · むずかしい</option></select></label><span class="live"><i></i> LET’S PLAY</span></div>
+<div class="stats"><div><span>MOVES / 手数</span><strong id="moves">0</strong></div><div><span>TIME / 時間</span><strong id="time">00:00</strong></div><div><span>BEST / 最少手数</span><strong id="best">—</strong></div></div>
+<div id="board" class="board" aria-label="数字のタイル"></div>
+<p id="message" class="message" role="status" aria-live="polite">数字をタップして、空いたマスへ。</p>
+<button id="restart" class="restart">↻ <span>新しいパズル</span></button>
+</section>
+<footer><span>遊び方</span><p>数字を左上から順番に並べ、右下を空けるとクリア。<br>タップ・クリック、または矢印キーで操作できます。</p><small>TAKE A BREATH. MAKE A MOVE.</small></footer>
+</main>
+</body></html>

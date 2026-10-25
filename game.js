@@ -1,5 +1,5 @@
 'use strict';
-const {Game,LEVELS,WIDTH,HEIGHT,evaluateRule,isHan,buildMask}=window.Kotonoha;
+const {Game,LEVELS,WIDTH,HEIGHT,evaluateRule,sentenceParts,isHan,buildMask}=window.Kotonoha;
 const $=selector=>document.querySelector(selector);
 const canvas=$('#world'),ctx=canvas.getContext('2d');
 let game,editor,editorOriginalGame=null,clock=0,previous=0,accumulator=0,composition=false,jumpQueued=false,completed=new Set();
@@ -33,18 +33,18 @@ function makeGlyph(char,size){
 }
 function updateJumpCounter(){
   if(!game)return;
-  const text=`STAGE ${game.jumpsLeft} / ${game.rules.jumpCount} 回`;
+  const text=`残り ${game.jumpsLeft} / ${game.rules.jumpCount} 回`;
   if($('#jump-counter').textContent!==text)$('#jump-counter').textContent=text;
 }
 function validateDraft(){
-  const field=$('#rule-word'),note=$('#rule-validation'),result=evaluateRule(game.level.ruleKind,field.value);
+  const field=$('#rule-word'),note=$('#rule-validation'),result=evaluateRule(game.level.ruleText||game.level.ruleKind,field.value);
   const designing=editor&&editor.editing,pending=result.ok&&result.word!==game.word;
   field.setAttribute('aria-invalid',String(!composition&&!result.ok));note.classList.toggle('error',!composition&&!result.ok);
   if(composition)note.textContent='変換を確定してから反映できます。';
   else if(!result.ok)note.textContent=result.message;
   else note.textContent=pending?'未反映：確定すると漢字が変わり、旅人と残り回数がスタートの状態に戻ります。':'適用中：ステージの空欄をクリックして書きかえられます。';
   $('#apply-rules').disabled=composition||!result.ok||game.running||game.won||designing;
-  $('#play').disabled=game.won||designing||(!game.running&&(composition||!result.ok||pending));
+  $('#play').disabled=game.won||designing||(!game.running&&(composition||!result.ok));
   return result;
 }
 function syncWorldInput(){
@@ -55,11 +55,11 @@ function syncWorldInput(){
 }
 function updateUI(){
   const designing=editor&&editor.editing,level=designing?editor.document.data:game.level;
-  $('#stage-number').textContent=designing?'STUDIO':level.chapter;$('#stage-title').textContent=level.title;
+  document.body.classList.toggle('editing',!!designing);$('#stage-number').textContent=designing?'EDITOR':game.index>=0?`STAGE ${game.index+1}`:'TEST';$('#stage-title').textContent=level.title;
   $('#scene-kicker').textContent=designing?'地面はドラッグ。道具を選んでステージを描こう。':level.kicker;$('#level-hint').textContent=game.level.hint;
   $('#editor-open').disabled=!!designing;
   $('#mode-tag').textContent=designing?'BUILD MODE':game.won?'CLEAR':game.running?'RUNNING':'INPUT MODE';
-  $('#play').textContent=game.running?'Ⅱ 入力に戻る':'▶ 旅をはじめる';
+  $('#play').textContent=game.running?'停止':'開始';
   $('#retry').disabled=game.won||designing;$('#win-panel').hidden=!game.won||designing;
   $('#glyph-count').textContent=`${game.placed.length} / 1`;
   $('#rule-effect').textContent=game.rule.description+(game.level.ruleKind==='body'?` このステージのジャンプは合計${game.rules.jumpCount}回。着地では回復しません。`:'');
@@ -68,7 +68,7 @@ function updateUI(){
   syncWorldInput();validateDraft();updateJumpCounter();
 }
 function syncPlayField(){composition=false;$('#rule-word').value=game.word;syncWorldInput();}
-function loadLevel(index){clearInput();game.load(index);syncPlayField();updateUI();tell(game.level.hint);}
+function loadLevel(index){clearInput();const assigned=editor&&editor.store.assigned(index);if(assigned){game.loadCustom(assigned);game.index=index;}else game.load(index);syncPlayField();updateUI();tell(game.level.hint);}
 function loadCustomStage(level){
   const next=new Game(0,makeGlyph),result=next.loadCustom(level);if(!result.ok)return result;
   game=next;clearInput();syncPlayField();updateUI();return result;
@@ -77,14 +77,16 @@ function restartLevel(){if(game.index>=0)loadLevel(game.index);else{loadCustomSt
 function pointerPosition(event){const r=canvas.getBoundingClientRect();return {x:(event.clientX-r.left)/r.width*WIDTH,y:(event.clientY-r.top)/r.height*HEIGHT};}
 function setupControls(){
   LEVELS.forEach((level,index)=>{
-    const button=document.createElement('button');button.className='chapter';button.textContent=['一','二','三','四'][index];button.title=`${level.chapter}：${level.title}`;button.setAttribute('aria-label',button.title);
+    const button=document.createElement('button');button.className='chapter';button.textContent=String(index+1);button.title=`STAGE ${index+1}`;button.setAttribute('aria-label',button.title);
     button.addEventListener('click',()=>loadLevel(index));$('#chapters').append(button);
   });
+  $('#challenge').addEventListener('click',()=>{document.body.classList.remove('menu-mode');document.body.classList.add('challenge-mode');syncWorldInput();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){game.running=false;clearInput();document.body.classList.remove('challenge-mode');document.body.classList.add('menu-mode');updateUI();}});
   const field=$('#rule-word');
   field.addEventListener('compositionstart',()=>{composition=true;validateDraft();});
   field.addEventListener('compositionend',()=>{composition=false;validateDraft();});
   field.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.isComposing||composition||e.keyCode===229))e.preventDefault();});
-  field.addEventListener('input',()=>{validateDraft();draw();});
+  field.addEventListener('input',()=>{const result=validateDraft();tell(result.ok?'':result.message,!result.ok&&!composition);draw();});
   $('#rules-form').addEventListener('submit',e=>{
     e.preventDefault();if(composition)return;
     const result=game.applyRule($('#rule-word').value);
@@ -93,7 +95,7 @@ function setupControls(){
     tell(result.message,!result.ok);
   });
   $('#play').addEventListener('click',()=>{
-    if(game.won)return;game.running=!game.running;clearInput();updateUI();
+    if(game.won)return;if(!game.running){const result=game.applyRule(field.value);if(!result.ok){tell(result.message,true);return;}}game.running=!game.running;clearInput();updateUI();
     tell(game.running?`← → で移動。Spaceを押し直すと、このステージで残り${game.jumpsLeft}回ジャンプできます。着地しても回復しません。`:'時間を止めました。ステージ内の空欄で漢字を変えられます。');
     if(game.running)canvas.focus({preventScroll:true});
   });
@@ -168,9 +170,9 @@ function drawGoal(level=game.level){
   text('EXIT',px,py-85,10,'#83d4d7','PixelJP,monospace');
 }
 function drawRuleSentence(level,word,mask){
-  const[x,y,size]=level.letter,cy=y+size/2,prefix=level.ruleKind==='jumps'?'このステージで':'体が',suffix=level.ruleKind==='jumps'?'回まで飛べる。':'くなる。';
+  const[x,y,size]=level.letter,cy=y+size/2,[prefix,suffix]=sentenceParts(level);
   ctx.save();ctx.font='18px PixelJP,monospace';ctx.textBaseline='middle';ctx.fillStyle='#91bad0';
-  ctx.textAlign='right';ctx.fillText(prefix,x-12,cy);ctx.textAlign='left';ctx.fillText(suffix,x+size+12,cy);ctx.restore();
+  ctx.textAlign='right';ctx.fillText(prefix,x-12,cy,Math.max(1,x-20));ctx.textAlign='left';ctx.fillText(suffix,x+size+12,cy,Math.max(1,WIDTH-x-size-20));ctx.restore();
   if(mask)ctx.drawImage(mask.canvas,x,y);else if(isHan(word))ctx.drawImage(makeGlyph(word,size).canvas,x,y);else text(word||'?',x+size/2,cy,Math.min(45,size/Math.max(1,Array.from(word).length)),'#ffb49d','PixelJP,monospace');
 }
 function drawEditorScene(){
@@ -189,9 +191,9 @@ function draw(){
 }
 function onWin(){
   clearInput();if(game.index>=0){completed.add(game.index);try{localStorage.setItem('kotonoha-one-rule-completed',JSON.stringify([...completed]));}catch{}}
-  $('#win-title').textContent=`${game.level.chapter} クリア`;
-  $('#win-detail').textContent=`一文字「${game.word}」 · ${Math.ceil(game.elapsed)}秒 · ${game.rule.sentence}`;
-  $('#next-level').textContent=game.index===LEVELS.length-1?'最初の景へ戻る ↺':'次の景へ →';updateUI();tell('あなたの文字が、道になりました。別の一文字でも、この文を試してみよう。');
+  $('#win-title').textContent=game.index>=0?`STAGE ${game.index+1} CLEAR`:'CLEAR';
+  $('#win-detail').textContent='';
+  $('#next-level').textContent=game.index===LEVELS.length-1?'STAGE 1 へ':'次の STAGE';updateUI();tell('あなたの文字が、道になりました。別の一文字でも、この文を試してみよう。');
 }
 function frame(timestamp){
   const delta=Math.min((timestamp-previous)/1000||0,.05);previous=timestamp;clock+=delta;accumulator+=delta;
@@ -206,7 +208,7 @@ async function bootstrap(){
   try{await document.fonts.load('16px PixelJP','漢字');}catch{}
   if(!fontLoaded)glyphFont='"Hiragino Sans","Noto Sans CJK JP",sans-serif';
   game=new Game(0,makeGlyph);
-  editor=new window.KotonohaEditor.StageEditor({makeGlyph,notify:tell,getLevel:()=>({...game.level,word:game.word}),onBegin:()=>{clearInput();game.running=false;editorOriginalGame=game;},onClose:()=>{if(editorOriginalGame){game=editorOriginalGame;editorOriginalGame=null;}clearInput();syncPlayField();updateUI();},onChange:()=>{if(editor&&editor.editing){clearInput();game.running=false;}updateUI();},loadStage:loadCustomStage});
+  editor=new window.KotonohaEditor.StageEditor({makeGlyph,notify:tell,getLevel:()=>({...game.level,word:game.word}),onBegin:()=>{clearInput();game.running=false;editorOriginalGame=game;},onClose:()=>{if(editorOriginalGame){game=editorOriginalGame;editorOriginalGame=null;if(game.index>=0)loadLevel(game.index);}clearInput();syncPlayField();updateUI();},onChange:()=>{if(editor&&editor.editing){clearInput();game.running=false;}updateUI();},loadStage:loadCustomStage});
   setupControls();loadLevel(0);
   if(typeof ResizeObserver!=='undefined')new ResizeObserver(syncWorldInput).observe(canvas);else window.addEventListener('resize',syncWorldInput);
   tell(fontLoaded?game.level.hint:'細字フォントを取得できなかったため、端末の字体で遊べます。線と当たり判定には同じ字形を使っています。');

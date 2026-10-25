@@ -27,6 +27,13 @@ class StageStore{
     if(index>=0)records[index]=record;else records.push(record);
     const result=this.write(records);return result.ok?{ok:true,record}:result;
   }
+  assigned(index){
+    try{const data=JSON.parse(this.storage.getItem('kotonoha-stage-slots-v1')||'{}');const result=validateStage(data[index]);return result.ok?result.level:null;}catch{return null;}
+  }
+  assign(index,stage){
+    const checked=stage===null?{ok:true}:validateStage(stage);if(!checked.ok)return checked;
+    try{const data=JSON.parse(this.storage.getItem('kotonoha-stage-slots-v1')||'{}');if(stage===null)delete data[index];else data[index]=checked.level;this.storage.setItem('kotonoha-stage-slots-v1',JSON.stringify(data));return {ok:true};}catch{return {ok:false,message:'STAGE の設定を保存できませんでした。'};}
+  }
   remove(id){const current=this.read();if(!current.ok)return current;const record=current.records.find(r=>r.id===id);if(!record)return {ok:false,message:'保存したステージが見つかりません。'};const result=this.write(current.records.filter(r=>r.id!==id));return result.ok?{ok:true,record}:result;}
   restore(record){const current=this.read();if(!current.ok)return current;if(current.records.some(r=>r.id===record.id)||current.records.length>=20)return {ok:false,message:'このステージを戻せません。'};const checked=validateStage(record.stage);if(!checked.ok)return checked;return this.write([...current.records,{id:record.id,stage:checked.level}]);}
 }
@@ -46,14 +53,14 @@ class StageEditor{
   sync(){
     const $=s=>document.querySelector(s);$('#editor-panel').hidden=!this.editing;$('#play-sidebar').hidden=this.editing;$('#editor-return').hidden=!this.testing;$('#rule-word').hidden=this.editing;
     $('.canvas-wrap').classList.toggle('studio-mode',this.editing);$('#editor-open').disabled=this.editing;$('#editor-open').textContent=this.testing?'↶ ステージ編集に戻る':'＋ ステージを作る';
-    if(this.document){const d=this.document.data;$('#editor-title').value=d.title;$('#editor-word').value=d.word;$('#editor-jumps').value=d.baseJumps;$('#editor-size').value=d.letter[2];$('#editor-size-value').textContent=d.letter[2];$('#base-jumps-wrap').hidden=d.ruleKind!=='body';document.querySelectorAll('[name="sentence-kind"]').forEach(r=>r.checked=r.value===d.ruleKind);$('#editor-summary').textContent=`地面 ${d.regions.length} / 60個 · 入力欄 (${d.letter[0]}, ${d.letter[1]}) · 空欄は一つ`;
+    if(this.document){const d=this.document.data;$('#editor-title').value=d.title;$('#editor-rule-text').value=d.ruleText||(d.ruleKind==='jumps'?'このステージで［字］回まで飛べる。':'体が［字］くなる。');$('#editor-word').value=d.word;$('#editor-jumps').value=d.baseJumps;$('#editor-size').value=d.letter[2];$('#editor-size-value').textContent=d.letter[2];$('#base-jumps-wrap').hidden=false;document.querySelectorAll('[name="sentence-kind"]').forEach(r=>r.checked=r.value===d.ruleKind);$('#editor-summary').textContent=`地面 ${d.regions.length} / 60個 · 入力欄 (${d.letter[0]}, ${d.letter[1]}) · 空欄は一つ`;
       $('#editor-undo').disabled=!this.document.past.length;$('#editor-redo').disabled=!this.document.future.length;
     }
     document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===this.tool)));
     const tips={ground:'ドラッグして長方形の地面を描きます。クリックだけなら25px四方です。',start:'地面の上端をクリックして、スタート（足元の位置）を置きます。',goal:'地面の上端をクリックして、ゴールを置きます。',rule:'クリックした場所に、文章と漢字の入力欄をまとめて置きます。',erase:'消したい地面をクリックします。「元に戻す」で復元できます。'};
     $('#editor-tool-help').textContent=tips[this.tool];this.options.onChange();
   }
-  readFields(){if(!this.document)return;const $=s=>document.querySelector(s);this.document.change(d=>{d.title=$('#editor-title').value;d.word=$('#editor-word').value.trim();d.baseJumps=Number($('#editor-jumps').value);});}
+  readFields(){if(!this.document)return;const $=s=>document.querySelector(s);this.document.change(d=>{d.title=$('#editor-title').value;d.ruleText=$('#editor-rule-text').value;d.word=$('#editor-word').value.trim();d.baseJumps=Number($('#editor-jumps').value);});}
   check(){this.readFields();return validateStage(this.document.data,this.options.makeGlyph);}
   test(){const checked=this.check();if(!checked.ok){this.notify(checked.message,true);this.sync();return;}const result=this.options.loadStage(checked.level);if(!result.ok){this.notify(result.message,true);return;}this.editing=false;this.testing=true;this.sync();this.notify('試遊モードです。「旅をはじめる」で開始し、「編集に戻る」で下書きに戻れます。');}
   save(copy=false){const checked=this.check();if(!checked.ok){this.notify(checked.message,true);return;}const result=this.store.save(checked.level,copy?null:this.currentId);if(!result.ok){this.notify(result.message,true);return;}this.currentId=result.record.id;this.document.data=clone(result.record.stage);this.sync();this.renderLibrary();this.notify('このブラウザにステージを保存しました。別の端末へはJSONで持ち出せます。');}
@@ -77,8 +84,10 @@ class StageEditor{
   bind(){const $=s=>document.querySelector(s);
     $('#editor-open').addEventListener('click',()=>this.open());$('#editor-return').addEventListener('click',()=>{this.editing=true;this.testing=false;this.sync();});$('#editor-close').addEventListener('click',()=>this.close());
     document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>{this.tool=b.dataset.tool;this.sync();}));
-    for(const field of ['#editor-title','#editor-word','#editor-jumps'])$(field).addEventListener('change',()=>{this.readFields();this.sync();});
+    for(const field of ['#editor-title','#editor-word','#editor-jumps','#editor-rule-text'])$(field).addEventListener('change',()=>{this.readFields();this.sync();});
     document.querySelectorAll('[name="sentence-kind"]').forEach(r=>r.addEventListener('change',()=>{if(!r.checked)return;this.readFields();this.document.change(d=>{d.ruleKind=r.value;if(!api.evaluateRule(d.ruleKind,d.word).ok)d.word=d.ruleKind==='jumps'?'三':'軽';});this.sync();}));
+    $('#editor-assign').addEventListener('click',()=>{const checked=this.check();if(!checked.ok){this.notify(checked.message,true);return;}const index=Number($('#editor-slot').value),result=this.store.assign(index,checked.level);this.notify(result.ok?`STAGE ${index+1} に設定しました。`:result.message,!result.ok);});
+    $('#editor-unassign').addEventListener('click',()=>{const index=Number($('#editor-slot').value),result=this.store.assign(index,null);this.notify(result.ok?`STAGE ${index+1} を初期状態に戻しました。`:result.message,!result.ok);});
     $('#editor-size').addEventListener('input',()=>{const size=Number($('#editor-size').value);this.document.change(d=>{d.letter[2]=size;d.letter[0]=Math.max(150,Math.min(850-size,d.letter[0]));d.letter[1]=Math.max(60,Math.min(495-size,d.letter[1]));});this.sync();});
     $('#editor-undo').addEventListener('click',()=>{this.document.undo();this.sync();});$('#editor-redo').addEventListener('click',()=>{this.document.redo();this.sync();});
     $('#editor-test').addEventListener('click',()=>this.test());$('#editor-save').addEventListener('click',()=>this.save());$('#editor-save-new').addEventListener('click',()=>this.save(true));$('#editor-export').addEventListener('click',()=>this.export());

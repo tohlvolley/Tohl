@@ -4,10 +4,10 @@
   const WIDTH=1000,HEIGHT=500;
   const GRAVITY={軽:550,並:1050,重:1550};
   const LEVELS=[
-    {title:'一文字、ひとつのルール',chapter:'第一景',kicker:'文に書いた、その文字で渡る。',ruleKind:'jumps',word:'三',baseJumps:1,letter:[410,290,180],start:[65,420],goal:[925,420],hint:'空欄の文字が、そのまま一つの足場になる。入力する場所は固定。ステージの文をクリックして漢字を変えよう。',regions:[{x:0,y:420,w:300,h:80},{x:700,y:420,w:300,h:80}]},
-    {title:'ことばの重さ',chapter:'第二景',kicker:'体と足場が、同じ文字で変わる。',ruleKind:'body',word:'軽',baseJumps:6,letter:[400,260,180],start:[55,430],goal:[935,240],hint:'体についての文を完成させる景。文字が体にどう働くかを考え、足場の形も活かそう。',regions:[{x:0,y:430,w:280,h:70},{x:700,y:240,w:300,h:260}]},
-    {title:'字形と動き',chapter:'第三景',kicker:'その意味と、その輪郭を使う。',ruleKind:'body',word:'速',baseJumps:6,letter:[420,260,200],start:[60,420],goal:[920,420],hint:'同じ文でも、別の漢字なら動きも字形も変わる。入力は自由。意味が成立するときだけ反映できる。',regions:[{x:0,y:420,w:240,h:80},{x:760,y:420,w:240,h:80}]},
-    {title:'一文字の可能性',chapter:'最終景',kicker:'ひとつの字で、道をひらく。',ruleKind:'jumps',word:'五',baseJumps:1,letter:[430,200,200],start:[50,430],goal:[930,180],hint:'置けるのは一文字だけ。跳べる回数と、文字の線のかたち。その両方を考えて高い門を目指そう。',regions:[{x:0,y:430,w:220,h:70},{x:780,y:180,w:220,h:320}]}
+    {title:'STAGE 1',chapter:'STAGE 1',kicker:'文に書いた、その文字で渡る。',ruleKind:'jumps',word:'三',baseJumps:1,letter:[410,290,180],start:[65,420],goal:[925,420],hint:'空欄の文字が、そのまま一つの足場になる。入力する場所は固定。ステージの文をクリックして漢字を変えよう。',regions:[{x:0,y:420,w:300,h:80},{x:700,y:420,w:300,h:80}]},
+    {title:'STAGE 2',chapter:'STAGE 2',kicker:'体と足場が、同じ文字で変わる。',ruleKind:'body',word:'軽',baseJumps:6,letter:[400,260,180],start:[55,430],goal:[935,240],hint:'体についての文を完成させる景。文字が体にどう働くかを考え、足場の形も活かそう。',regions:[{x:0,y:430,w:280,h:70},{x:700,y:240,w:300,h:260}]},
+    {title:'STAGE 3',chapter:'STAGE 3',kicker:'その意味と、その輪郭を使う。',ruleKind:'body',word:'速',baseJumps:6,letter:[420,260,200],start:[60,420],goal:[920,420],hint:'同じ文でも、別の漢字なら動きも字形も変わる。入力は自由。意味が成立するときだけ反映できる。',regions:[{x:0,y:420,w:240,h:80},{x:760,y:420,w:240,h:80}]},
+    {title:'STAGE 4',chapter:'STAGE 4',kicker:'ひとつの字で、道をひらく。',ruleKind:'jumps',word:'五',baseJumps:1,letter:[430,200,200],start:[50,430],goal:[930,180],hint:'置けるのは一文字だけ。跳べる回数と、文字の線のかたち。その両方を考えて高い門を目指そう。',regions:[{x:0,y:430,w:220,h:70},{x:780,y:180,w:220,h:320}]}
   ];
   const BODY_RULES={
     軽:{gravity:'軽',description:'重力が弱まり、ふわりと高く跳べる。'},
@@ -65,7 +65,22 @@
     result+=pending===null?0:pending;
     return result<=9999?result:null;
   }
+  function sentenceParts(level){
+    const template=level.ruleText||(level.ruleKind==='jumps'?'このステージで［字］回まで飛べる。':'体が［字］くなる。');
+    return template.split('［字］');
+  }
   function evaluateRule(kind,value){
+    let template=null;
+    if(kind!=='jumps'&&kind!=='body'){
+      template=String(kind);
+      if(template.length>100||template.split('［字］').length!==2)return {ok:false,message:'ルール文には［字］を一つだけ入れてください（100文字以内）。'};
+      const normalized=template.replace(/[\s。、！!]/g,'');
+      if(/^(?:このステージで|このステージでは|ステージ内で|合計|全部で)?［字］回(?:まで)?(?:飛べる|跳べる|ジャンプできる)$/.test(normalized))kind='jumps';
+      else if(/^(?:体|身体|からだ)が［字］くなる$/.test(normalized))kind='body';
+      else return {ok:false,message:'このルール文の意味は未対応です。例：このステージで［字］回まで飛べる。／体が［字］くなる。'};
+      const result=evaluateRule(kind,value);
+      return result.ok?{...result,sentence:template.replace('［字］',result.word)}:result;
+    }
     const word=String(value).trim();
     if(!isHan(word))return {ok:false,message:'空欄には漢字を一文字だけ入力してください。その一文字が足場になります。'};
     if(kind==='jumps'){
@@ -101,8 +116,8 @@
     if(!source||typeof source!=='object'||Array.isArray(source))return fail('ステージのデータ形式が正しくありません。');
     const finite=(n,min,max)=>Number.isInteger(n)&&n>=min&&n<=max;
     if(typeof source.title!=='string'||!source.title.trim()||source.title.length>40)return fail('ステージ名は1〜40文字で入力してください。');
-    if(!['jumps','body'].includes(source.ruleKind))return fail('文章の型を選んでください。');
-    const rule=evaluateRule(source.ruleKind,source.word);
+    if(!source.ruleText&&!['jumps','body'].includes(source.ruleKind))return fail('文章の型を選んでください。');
+    const rule=evaluateRule(source.ruleText||source.ruleKind,source.word);
     if(!rule.ok)return fail(rule.message);
     const baseJumps=source.baseJumps===undefined?6:source.baseJumps;
     if(!finite(baseJumps,0,999))return fail('基本ジャンプ回数は0〜999回で指定してください。');
@@ -130,7 +145,7 @@
       if(!mask||!mask.ink)return fail('この漢字の字形を表示できません。');
       if(regions.some(r=>maskIntersects(mask,letter[0],letter[1],r))||maskIntersects(mask,letter[0],letter[1],{x:sx,y:sy-h,w,h})||maskIntersects(mask,letter[0],letter[1],{x:gx-18,y:gy-64,w:36,h:64}))return fail('入力欄の文字が地面・スタート・ゴールに重なっています。');
     }
-    const level={title:source.title.trim(),chapter:'自作',kicker:'あなたがつくった、一文字の世界。',hint:'ステージ内の空欄を書きかえて、出口を目指そう。',ruleKind:source.ruleKind,word:rule.word,baseJumps,letter:[...letter],start:[sx,sy],goal:[gx,gy],regions};
+    const level={title:source.title.trim(),chapter:'自作',kicker:'あなたがつくった、一文字の世界。',hint:'ステージ内の空欄を書きかえて、出口を目指そう。',ruleText:source.ruleText||undefined,ruleKind:source.ruleKind,word:rule.word,baseJumps,letter:[...letter],start:[sx,sy],goal:[gx,gy],regions};
     return {ok:true,level};
   }
   class Game{
@@ -145,7 +160,7 @@
     initialize(index,level){
       this.index=index;this.level=JSON.parse(JSON.stringify(level));this.placed=[];this.nextId=1;
       this.running=false;this.won=false;this.deaths=0;this.elapsed=0;this.lastEvent='';
-      this.word=this.level.word;this.rule=evaluateRule(this.level.ruleKind,this.word);
+      this.word=this.level.word;this.rule=evaluateRule(this.level.ruleText||this.level.ruleKind,this.word);
       this.rules=this.rulesFor(this.rule);this.respawn();
       if(this.makeGlyph){const[x,y,size]=this.level.letter;this.placed=[{id:this.nextId++,char:this.word,x,y,size,mask:this.makeGlyph(this.word,size)}];}
     }
@@ -155,7 +170,7 @@
     get jumpsLeft(){return Math.max(0,this.rules.jumpCount-this.player.jumpsUsed);}
     applyRule(value,size){
       if(this.running||this.won)return {ok:false,message:'配置モードで文を書きかえてください。'};
-      const rule=evaluateRule(this.level.ruleKind,value);
+      const rule=evaluateRule(this.level.ruleText||this.level.ruleKind,value);
       if(!rule.ok)return rule;
       if(!this.makeGlyph)return {ok:false,message:'文字の字体を準備しています。'};
       if(rule.word===this.word)return {ok:true,changed:false,message:'この漢字はすでに反映されています。残り回数はそのままです。'};
@@ -220,6 +235,6 @@
       if(intersects(p,{x:gx-18,y:gy-64,w:36,h:64})){this.won=true;this.running=false;this.lastEvent='win';}
     }
   }
-  const api={Game,LEVELS,WIDTH,HEIGHT,GRAVITY,isHan,parseNumber,evaluateRule,validateStage,buildMask,maskIntersects};
+  const api={Game,LEVELS,WIDTH,HEIGHT,GRAVITY,isHan,parseNumber,evaluateRule,sentenceParts,validateStage,buildMask,maskIntersects};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Kotonoha=api;
 })(typeof window!=='undefined'?window:globalThis);

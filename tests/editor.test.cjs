@@ -44,3 +44,20 @@ test('a body-size rule cannot embed a reset traveler in a ceiling',()=>{
  const source=clone(LEVELS[1]);source.regions.push({x:50,y:375,w:100,h:20});const game=new Game(0,glyph);assert(game.loadCustom(source).ok);const before=game.word;assert.equal(game.applyRule('長').ok,false);assert.equal(game.word,before);assert.equal(game.player.h,30);
  const high=valid();high.ruleKind='body';high.word='長';high.start=[65,75];high.regions[0]={x:0,y:75,w:300,h:425};assert.equal(validateStage(high).ok,false);
 });
+
+test('custom rule text survives save and assignment and unsupported sentences are rejected',()=>{
+  const data=new Map(),storage={getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)};
+  const store=new StageStore(storage),source=JSON.parse(JSON.stringify(LEVELS[0]));
+  source.ruleText='合計［字］回ジャンプできる。';
+  assert.equal(store.assign(2,source).ok,true);
+  assert.equal(new StageStore(storage).assigned(2).ruleText,source.ruleText);
+  assert.equal(new StageStore(storage).assigned(1),null);
+  const game=new Game(0);game.loadCustom(store.assigned(2));
+  assert.equal(game.rules.jumpCount,3);
+  assert.equal(game.rule.sentence,'合計三回ジャンプできる。');
+  source.ruleText='空が［字］になる。';
+  assert.equal(store.assign(2,source).ok,false);
+  assert.equal(store.assigned(2).ruleText,'合計［字］回ジャンプできる。');
+  assert.equal(store.assign(2,null).ok,true);
+  assert.equal(store.assigned(2),null);
+});

@@ -75,13 +75,53 @@ function loadCustomStage(level){
 }
 function restartLevel(){if(game.index>=0)loadLevel(game.index);else{loadCustomStage(game.level);updateUI();}}
 function pointerPosition(event){const r=canvas.getBoundingClientRect();return {x:(event.clientX-r.left)/r.width*WIDTH,y:(event.clientY-r.top)/r.height*HEIGHT};}
-function setupControls(){
-  LEVELS.forEach((level,index)=>{
-    const button=document.createElement('button');button.className='chapter';button.textContent=String(index+1);button.title=`STAGE ${index+1}`;button.setAttribute('aria-label',button.title);
-    button.addEventListener('click',()=>loadLevel(index));$('#chapters').append(button);
+let menuWasRunning=false;
+function setScreen(screen){
+  document.body.dataset.screen=screen;
+  document.body.classList.toggle('challenge-mode',screen==='play');
+  document.body.classList.toggle('menu-mode',screen!=='play');
+  clearInput();if(screen!=='play')game.running=false;
+  if(screen==='list')renderStageCards();
+  syncWorldInput();
+}
+function renderStageCards(){
+  const holder=$('#stage-cards');holder.replaceChildren();
+  LEVELS.forEach((original,index)=>{
+    const level=editor.store.assigned(index)||original,button=document.createElement('button');
+    button.className='stage-card';button.type='button';button.setAttribute('aria-label',`STAGE ${index+1} ${level.title}`);
+    const preview=document.createElement('canvas');preview.width=400;preview.height=200;preview.setAttribute('aria-hidden','true');
+    const c=preview.getContext('2d');c.scale(.4,.4);c.fillStyle='#101d31';c.fillRect(0,0,WIDTH,HEIGHT);
+    for(const r of level.regions){c.fillStyle='#193c45';c.fillRect(r.x,r.y,r.w,r.h);c.fillStyle='#74c7af';c.fillRect(r.x,r.y,r.w,5);}
+    c.imageSmoothingEnabled=false;c.drawImage(makeGlyph(level.word,level.letter[2]).canvas,...level.letter.slice(0,2));
+    c.fillStyle='#ece5cf';c.fillRect(level.start[0],level.start[1]-30,18,30);c.strokeStyle='#68cce4';c.lineWidth=5;c.strokeRect(level.goal[0]-23,level.goal[1]-70,46,68);
+    const number=document.createElement('strong');number.textContent=`STAGE ${index+1}`;
+    const title=document.createElement('span');title.textContent=level.title===number.textContent?'':level.title;
+    const status=document.createElement('small');status.textContent=completed.has(index)?'CLEAR':'未クリア';
+    button.append(preview,number,title,status);button.addEventListener('click',()=>{loadLevel(index);setScreen('play');$('#play').focus({preventScroll:true});});holder.append(button);
   });
-  $('#challenge').addEventListener('click',()=>{document.body.classList.remove('menu-mode');document.body.classList.add('challenge-mode');syncWorldInput();});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){game.running=false;clearInput();document.body.classList.remove('challenge-mode');document.body.classList.add('menu-mode');updateUI();}});
+}
+function closeStageMenu(resume=false){
+  $('#stage-menu').close();
+  if(resume&&menuWasRunning&&!game.won){game.running=true;updateUI();canvas.focus({preventScroll:true});}
+  menuWasRunning=false;
+}
+function openStageMenu(){
+  if($('#stage-menu').open)return;
+  menuWasRunning=game.running;game.running=false;clearInput();updateUI();
+  $('#menu-editor').hidden=!editor.testing;$('#stage-menu').showModal();
+}
+function setupControls(){
+  $('#home-stages').disabled=false;$('#home-editor').disabled=false;
+  $('#home-stages').addEventListener('click',()=>{setScreen('list');$('#list-title').focus();});
+  $('#list-home').addEventListener('click',()=>{setScreen('home');$('#home-stages').focus();});
+  $('#home-editor').addEventListener('click',()=>editor.open());
+  $('#stage-menu-open').addEventListener('click',openStageMenu);
+  $('#menu-resume').addEventListener('click',()=>closeStageMenu(true));
+  $('#menu-restart').addEventListener('click',()=>{closeStageMenu();restartLevel();});
+  $('#menu-stages').addEventListener('click',()=>{closeStageMenu();if(editor.active)editor.close();setScreen('list');$('#list-title').focus();});
+  $('#menu-editor').addEventListener('click',()=>{closeStageMenu();$('#editor-return').click();});
+  $('#stage-menu').addEventListener('cancel',e=>{e.preventDefault();closeStageMenu(true);});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!e.isComposing&&document.body.dataset.screen==='play'&&!$('#stage-menu').open&&!$('#help').open){e.preventDefault();openStageMenu();}});
   const field=$('#rule-word');
   field.addEventListener('compositionstart',()=>{composition=true;validateDraft();});
   field.addEventListener('compositionend',()=>{composition=false;validateDraft();});
@@ -108,7 +148,7 @@ function setupControls(){
   canvas.addEventListener('contextmenu',e=>e.preventDefault());
   const keyControls={ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right',ArrowUp:'jump',w:'jump',W:'jump',' ':'jump'};
   document.addEventListener('keydown',e=>{
-    if(e.target.matches('input,textarea,select')||e.isComposing||$('#help').open)return;
+    if(e.target.matches('input,textarea,select')||e.isComposing||$('#help').open||$('#stage-menu').open||document.body.dataset.screen!=='play'&&!(editor&&editor.editing))return;
     if(editor&&editor.editing){if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();if(e.shiftKey)editor.document.redo();else editor.document.undo();editor.sync();}return;}
     const control=keyControls[e.key];if(!control)return;
     if(e.key===' '&&e.target.closest('button'))return;
@@ -208,7 +248,7 @@ async function bootstrap(){
   try{await document.fonts.load('16px PixelJP','漢字');}catch{}
   if(!fontLoaded)glyphFont='"Hiragino Sans","Noto Sans CJK JP",sans-serif';
   game=new Game(0,makeGlyph);
-  editor=new window.KotonohaEditor.StageEditor({makeGlyph,notify:tell,getLevel:()=>({...game.level,word:game.word}),onBegin:()=>{clearInput();game.running=false;editorOriginalGame=game;},onClose:()=>{if(editorOriginalGame){game=editorOriginalGame;editorOriginalGame=null;if(game.index>=0)loadLevel(game.index);}clearInput();syncPlayField();updateUI();},onChange:()=>{if(editor&&editor.editing){clearInput();game.running=false;}updateUI();},loadStage:loadCustomStage});
+  editor=new window.KotonohaEditor.StageEditor({makeGlyph,notify:tell,getLevel:()=>({...game.level,word:game.word}),onBegin:()=>{clearInput();game.running=false;editorOriginalGame=game;},onClose:()=>{if(editorOriginalGame){game=editorOriginalGame;editorOriginalGame=null;if(game.index>=0)loadLevel(game.index);}clearInput();syncPlayField();updateUI();setScreen('home');},onChange:()=>{if(editor&&editor.editing){clearInput();game.running=false;setScreen('editor');}else if(editor&&editor.testing)setScreen('play');updateUI();},loadStage:loadCustomStage});
   setupControls();loadLevel(0);
   if(typeof ResizeObserver!=='undefined')new ResizeObserver(syncWorldInput).observe(canvas);else window.addEventListener('resize',syncWorldInput);
   tell(fontLoaded?game.level.hint:'細字フォントを取得できなかったため、端末の字体で遊べます。線と当たり判定には同じ字形を使っています。');

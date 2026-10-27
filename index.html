@@ -8,7 +8,7 @@
 <title>言ノ葉の道 — 漢字でつくるパズル</title>
 <link rel="preload" href="assets/DotGothic16.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/NotoSansCJKjp-Thin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=studio-6">
+<link rel="stylesheet" href="style.css?v=studio-7">
 <script>
 // Show a useful message even when an asset fails before the game starts.
 (function () {
@@ -31,19 +31,19 @@
   });
 }());
 </script>
-<script src="engine.js?v=studio-6" defer></script>
-<script src="editor.js?v=studio-6" defer></script>
-<script src="game.js?v=studio-6" defer></script>
+<script src="engine.js?v=studio-7" defer></script>
+<script src="editor.js?v=studio-7" defer></script>
+<script src="game.js?v=studio-7" defer></script>
 </head>
-<body class="menu-mode">
+<body class="menu-mode" data-screen="home">
 <noscript><p class="notice error">ゲームを遊ぶには、ブラウザのJavaScriptを有効にしてください。</p></noscript>
 <main class="shell">
 <header><a class="brand" href="./"><span class="brand-mark">言</span><span>言ノ葉の道<small>KOTONOHA // RULE RUNNER</small></span></a><span class="header-note">PIXEL WORLD / ONE GLYPH / ONE RULE</span><button id="editor-open" class="secondary" disabled>＋ ステージを作る</button><button id="help-open" class="quiet">遊び方 <span>?</span></button></header>
-<section class="heading"><div><p class="eyebrow">WRITE A RULE. BUILD YOUR WAY.</p><h1>その一文字が、<em>道になる。</em></h1><p>文に書いた一文字で、ルールも、足場も変わる。</p></div><div class="chapter-nav" id="chapters" aria-label="ステージ選択"></div></section>
-<button id="challenge" class="primary">開始する</button><p class="menu-help">STAGE を選んで開始。挑戦中は Esc キーでこの画面に戻ります。</p>
+<section id="home-screen" class="navigation-screen" aria-labelledby="home-title"><h1 id="home-title" tabindex="-1">言ノ葉の道</h1><div class="home-actions"><button id="home-stages" class="primary" disabled>ステージ一覧</button><button id="home-editor" class="secondary" disabled>ステージ作成</button></div></section>
+<section id="list-screen" class="navigation-screen" aria-labelledby="list-title"><div class="list-heading"><h1 id="list-title" tabindex="-1">ステージ一覧</h1><button id="list-home" class="secondary">トップに戻る</button></div><div id="stage-cards" class="stage-cards"></div></section>
 <div class="workspace">
 <section class="stage-panel" aria-label="ゲーム画面">
-<div class="stage-bar"><div><span class="stage-number" id="stage-number">STAGE 1</span><strong id="stage-title">一文字、ひとつのルール</strong></div><div class="stage-status"><span class="jump-counter" id="jump-counter">残り 2 / 2 回</span><span class="mode-tag" id="mode-tag">配置モード</span></div></div>
+<div class="stage-bar"><div><span class="stage-number" id="stage-number">STAGE 1</span><strong id="stage-title">一文字、ひとつのルール</strong></div><div class="stage-status"><span class="jump-counter" id="jump-counter">残り 2 / 2 回</span><span class="mode-tag" id="mode-tag">配置モード</span><button id="stage-menu-open" class="secondary" aria-haspopup="dialog" aria-controls="stage-menu">☰ メニュー</button></div></div>
 <div class="canvas-wrap"><canvas id="world" width="1000" height="500" tabindex="0" aria-label="漢字を置くゲーム盤。ルール文に入力した一文字の線が足場になります。配置中はクリック、実行中は左右キーとスペースで操作。"></canvas><input id="rule-word" class="world-input" disabled form="rules-form" value="三" autocomplete="off" spellcheck="false" aria-describedby="rule-validation" aria-label="ステージの文に埋め込まれた漢字一文字の入力欄"><div id="font-loading" class="font-loading">LOADING PIXEL FONT…</div><div class="scene-label"><span id="scene-kicker">一文字から、はじまる旅。</span></div><div class="win-panel" id="win-panel" hidden><span>CLEAR</span><h2 id="win-title">STAGE 1 クリア</h2><p id="win-detail"></p><button id="next-level" class="primary">次の STAGE →</button><button id="replay" class="quiet">もう一度遊ぶ</button></div></div>
 <div class="stage-controls"><button id="play" class="primary" disabled>開始</button><button id="retry" class="secondary">やり直し</button><button id="editor-return" class="quiet" hidden>編集に戻る</button><span class="keys"><kbd>←</kbd><kbd>→</kbd> 移動 <kbd>Space</kbd> ジャンプ</span></div>
 <div class="touch-controls" aria-label="タッチ操作"><button data-control="left" aria-label="左に移動">←</button><button data-control="right" aria-label="右に移動">→</button><button data-control="jump">ジャンプ ↑</button></div>
@@ -69,12 +69,13 @@
 <p id="editor-summary" class="editor-help"></p>
 <label class="editor-label" for="editor-slot">反映する STAGE<select id="editor-slot"><option value="0">STAGE 1</option><option value="1">STAGE 2</option><option value="2">STAGE 3</option><option value="3">STAGE 4</option></select></label><button id="editor-assign" class="secondary">この内容を STAGE に設定</button><button id="editor-unassign" class="quiet">選択した STAGE を初期状態に戻す</button><p class="editor-help">STAGE の設定はこのブラウザに保存されます。</p><div class="editor-actions"><button id="editor-test" class="primary">▶ このステージを試す</button><button id="editor-save" class="secondary">端末に保存</button><button id="editor-save-new" class="secondary">コピーを保存</button><button id="editor-new" class="quiet">新しいステージ</button><button id="editor-export" class="quiet">JSONを書き出す ↓</button><label class="file-button">JSONを読み込む ↑<input id="editor-import" type="file" accept=".json,application/json"></label></div>
 <p class="editor-help">入力欄を動かすと文章も一緒に移動します。スタートとゴールは地面の上端をクリックして置きます。試遊でクリアできるか確認してください。</p>
-<button id="editor-close" class="quiet">元のゲームに戻る</button>
+<button id="editor-close" class="quiet">トップに戻る</button>
 </aside>
 </div>
 <section id="stage-library" class="stage-library"><div><p class="eyebrow">MY STAGES / LOCAL SAVE</p><h2>保存したステージ</h2><p>このブラウザに保存します。別の端末へはJSONで持ち出せます。</p></div><div id="saved-stages"></div><button id="restore-stage" class="quiet" hidden>直前に削除したステージを戻す</button></section>
 <section class="bottom-notes"><div><span>01</span><p><strong>INPUT</strong>文の空欄に、一文字を入力。</p></div><div><span>02</span><p><strong>SYNC</strong>その一文字だけが、世界に現れる。</p></div><div><span>03</span><p><strong>PLAY</strong>ルールと字形を使って、出口へ。</p></div></section>
 <footer><span>Tohl / 言ノ葉の道</span><span>SYSTEM ONLINE / FIND YOUR WAY_</span></footer>
 </main>
+<dialog id="stage-menu" aria-labelledby="stage-menu-title"><h2 id="stage-menu-title">メニュー</h2><div class="pause-actions"><button id="menu-restart" class="secondary">最初から</button><button id="menu-stages" class="secondary">ステージ選択に戻る</button><button id="menu-editor" class="secondary" hidden>編集に戻る</button><button id="menu-resume" class="primary">閉じる</button></div></dialog>
 <dialog id="help"><button id="help-close" class="dialog-close" aria-label="閉じる">×</button><p class="eyebrow">HOW TO PLAY / MANUAL</p><h2>ステージの文が、世界のルール。</h2><p>ステージ内の空欄をクリックし、漢字一文字を入力します。Enterまたは「漢字を確定」で反映。入力した文字だけが足場になり、文章のほかの文字は通り抜けられます。空欄の位置は固定です。</p><p><strong>「このステージで三回まで飛べる。」なら、スタートからクリアまで合計3回。</strong>着地しても残り回数は戻りません。空中でもジャンプできますが、ステージ全体の残り回数を使います。</p><p>漢字を変えると、旅人をスタートへ戻して残り回数をリセットします。不成立・解釈できない文は反映しません。同じ漢字の再確定や一時停止では回数は回復しません。</p><p><strong>← → / A D</strong> で移動、<strong>Space / ↑ / W</strong> でジャンプ。「スタートに戻る」で新しい挑戦を始められます。</p><p>「ステージを作る」から、地面・スタート・ゴール・入力欄を配置できます。地面はドラッグで描画し、他の道具はクリックで配置。試遊してから保存でき、JSONの書き出し・読み込みにも対応しています。</p><button id="help-start" class="primary">ENTER THE WORLD →</button></dialog>
 </body></html>

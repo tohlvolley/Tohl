@@ -11,7 +11,7 @@ test('stage documents support terrain edits, undo and redo without changing sour
  assert(doc.undo());assert.equal(doc.data.regions.length,2);assert(doc.redo());assert.equal(doc.data.regions.length,3);doc.undo();doc.change(d=>d.title='別の編集');assert.equal(doc.redo(),false);
 });
 test('invalid terrain, coordinates, rule words and unsupported formats are rejected',()=>{
- for(const edit of [d=>d.regions=[],d=>d.regions[0].w=1001,d=>d.regions[0].x=-1,d=>d.start=[400,420],d=>d.goal=[600,250],d=>d.letter=[0,200,180],d=>d.letter=[400,400,200],d=>d.word='猫',d=>d.baseJumps=Infinity,d=>d.title='']){
+ for(const edit of [d=>d.regions=[],d=>d.regions[0].w=1001,d=>d.regions[0].x=-1,d=>d.start=[400,420],d=>d.goal=[600,250],d=>d.letter=[-200,200,180],d=>d.letter=[400,500,200],d=>d.word='猫',d=>d.baseJumps=Infinity,d=>d.title='']){
   const level=valid();edit(level);assert.equal(validateStage(level).ok,false,JSON.stringify(level));
  }
  assert.equal(decodeStage('bad json').ok,false);assert.equal(decodeStage(JSON.stringify({format:'kotonoha-stage',version:2,stage:valid()})).ok,false);assert.equal(decodeStage('a'.repeat(100001)).ok,false);

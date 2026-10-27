@@ -1,13 +1,13 @@
 'use strict';
-const {Game,LEVELS,WIDTH,HEIGHT,evaluateRule,sentenceParts,isHan,buildMask}=window.Kotonoha;
+const {Game,LEVELS,WIDTH,HEIGHT,evaluateStageRule,inputBox,sentenceParts,isHan,buildMask}=window.Kotonoha;
 const $=selector=>document.querySelector(selector);
 const canvas=$('#world'),ctx=canvas.getContext('2d');
 let game,editor,editorOriginalGame=null,clock=0,previous=0,accumulator=0,composition=false,jumpQueued=false,completed=new Set();
-const input={left:false,right:false,jump:false},glyphCache=new Map();
+const input={left:false,right:false,jump:false,up:false,down:false},glyphCache=new Map();
 let glyphFont='"Kotonoha Thin","Hiragino Sans","Noto Sans CJK JP",sans-serif';
 try{const saved=JSON.parse(localStorage.getItem('kotonoha-one-rule-completed')||'[]');if(Array.isArray(saved))completed=new Set(saved.filter(n=>Number.isInteger(n)&&n>=0&&n<LEVELS.length));}catch{}
 function tell(message,error=false){$('#notice').textContent=message;$('#notice').classList.toggle('error',error);}
-function clearInput(){jumpQueued=false;input.left=false;input.right=false;input.jump=false;}
+function clearInput(){jumpQueued=false;input.left=false;input.right=false;input.jump=false;input.up=false;input.down=false;}
 function makeGlyph(char,size){
   const key=`${char}:${size}`;if(glyphCache.has(key))return glyphCache.get(key);
   // Rasterize the thin font into a 32-dot grid, then scale with nearest-neighbor.
@@ -28,7 +28,7 @@ function makeGlyph(char,size){
   const data=scaled.getImageData(0,0,size,size).data,alpha=new Uint8Array(size*size);
   for(let i=0;i<alpha.length;i++)alpha[i]=data[i*4+3];
   const mask=buildMask(size,size,alpha);mask.canvas=surface;
-  if(glyphCache.size>=128)glyphCache.delete(glyphCache.keys().next().value);
+  let area=[...glyphCache.values()].reduce((sum,m)=>sum+m.width*m.height,0);while(glyphCache.size&&(glyphCache.size>=64||area+size*size>6000000)){const first=glyphCache.keys().next().value,old=glyphCache.get(first);area-=old.width*old.height;glyphCache.delete(first);}
   glyphCache.set(key,mask);return mask;
 }
 function updateJumpCounter(){
@@ -37,7 +37,7 @@ function updateJumpCounter(){
   if($('#jump-counter').textContent!==text)$('#jump-counter').textContent=text;
 }
 function validateDraft(){
-  const field=$('#rule-word'),note=$('#rule-validation'),result=evaluateRule(game.level.ruleText||game.level.ruleKind,field.value);
+  const field=$('#rule-word'),note=$('#rule-validation'),result=evaluateStageRule(game.level,field.value);
   const designing=editor&&editor.editing,pending=result.ok&&result.word!==game.word;
   field.setAttribute('aria-invalid',String(!!field.value.trim()&&!composition&&!result.ok));note.classList.toggle('error',!composition&&!result.ok);
   if(composition)note.textContent='変換を確定してから反映できます。';
@@ -48,7 +48,7 @@ function validateDraft(){
   return result;
 }
 function syncWorldInput(){
-  if(!game)return;const field=$('#rule-word'),[x,y,size]=game.level.letter;
+  if(!game)return;const field=$('#rule-word'),{x,y,size}=inputBox(game.level);
   field.hidden=!!(editor&&editor.editing);field.disabled=game.running||game.won;
   field.style.left=`${x/WIDTH*100}%`;field.style.top=`${y/HEIGHT*100}%`;field.style.width=`${size/WIDTH*100}%`;field.style.height=`${size/HEIGHT*100}%`;
   field.style.fontSize=`${canvas.getBoundingClientRect().width/WIDTH*size*.8}px`;
@@ -92,7 +92,7 @@ function renderStageCards(){
     const preview=document.createElement('canvas');preview.width=400;preview.height=200;preview.setAttribute('aria-hidden','true');
     const c=preview.getContext('2d');c.scale(.4,.4);c.fillStyle='#101d31';c.fillRect(0,0,WIDTH,HEIGHT);
     for(const r of level.regions){c.fillStyle='#193c45';c.fillRect(r.x,r.y,r.w,r.h);c.fillStyle='#74c7af';c.fillRect(r.x,r.y,r.w,5);}
-    c.imageSmoothingEnabled=false;c.drawImage(makeGlyph(level.word,level.letter[2]).canvas,...level.letter.slice(0,2));
+    for(const o of level.objects||[]){c.fillStyle={crumble:'#ca9d62',vine:'#529d70',spike:'#d57485'}[o.type];c.fillRect(o.x,o.y,o.w,o.h);}
     c.fillStyle='#ece5cf';c.fillRect(level.start[0],level.start[1]-30,18,30);c.strokeStyle='#68cce4';c.lineWidth=5;c.strokeRect(level.goal[0]-23,level.goal[1]-70,46,68);
     const number=document.createElement('strong');number.textContent=`STAGE ${index+1}`;
     const title=document.createElement('span');title.textContent=level.title===number.textContent?'':level.title;
@@ -146,7 +146,7 @@ function setupControls(){
   canvas.addEventListener('pointerup',e=>{if(editor.editing)editor.pointerUp();if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);});
   canvas.addEventListener('pointercancel',()=>{if(editor)editor.drag=null;});
   canvas.addEventListener('contextmenu',e=>e.preventDefault());
-  const keyControls={ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right',ArrowUp:'jump',w:'jump',W:'jump',' ':'jump'};
+  const keyControls={ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right',ArrowUp:'up',w:'up',W:'up',ArrowDown:'down',s:'down',S:'down',' ':'jump'};
   document.addEventListener('keydown',e=>{
     if(e.target.matches('input,textarea,select')||e.isComposing||$('#help').open||$('#stage-menu').open||document.body.dataset.screen!=='play'&&!(editor&&editor.editing))return;
     if(editor&&editor.editing){if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();if(e.shiftKey)editor.document.redo();else editor.document.undo();editor.sync();}return;}
@@ -209,14 +209,33 @@ function drawGoal(level=game.level){
   rect(px-9,py-43,18,6,blink?'#9affcf':'#6ac09d');rect(px+3,py-49,6,18,blink?'#9affcf':'#6ac09d');
   text('EXIT',px,py-85,10,'#83d4d7','PixelJP,monospace');
 }
+function drawObjects(level=game.level,editing=false){
+  const objects=editing?(level.objects||[]):game.objects;
+  for(const o of objects){
+    if(o.type==='crumble'){
+      if(o.broken)continue;
+      const remaining=Math.max(0,o.delay-(o.used||0)),warning=remaining<o.delay*.4;
+      rect(o.x,o.y,o.w,o.h,warning?'#74423c':'#674f37');rect(o.x,o.y,o.w,4,warning?'#ff9782':'#ffcf76');
+      for(let x=o.x+10;x<o.x+o.w;x+=22){line(x,o.y+5,x+5,o.y+12,'#251f29',2);line(x+5,o.y+12,x+1,o.y+21,'#251f29',2);}
+      text(`${remaining.toFixed(1)}s`,o.x+o.w/2,o.y+Math.min(16,o.h/2),11,'#ffe5b0','PixelJP,monospace');
+    }else if(o.type==='vine'){
+      for(let x=o.x+o.w/2;x<o.x+o.w;x+=30){rect(x-2,o.y,4,o.h,'#73be83');for(let y=o.y+6;y<o.y+o.h;y+=18){rect(x-11,y,9,5,'#449768');rect(x+2,y+7,9,5,'#89d39a');}}
+      if(editing){ctx.strokeStyle='#529d7077';ctx.strokeRect(o.x,o.y,o.w,o.h);}
+    }else if(o.type==='spike'){
+      rect(o.x,o.y+o.h-4,o.w,4,'#874453');ctx.fillStyle='#f49aa5';for(let x=o.x;x<o.x+o.w;x+=16){ctx.beginPath();ctx.moveTo(x,o.y+o.h);ctx.lineTo(Math.min(x+8,o.x+o.w),o.y);ctx.lineTo(Math.min(x+16,o.x+o.w),o.y+o.h);ctx.fill();}
+    }
+  }
+}
 function drawRuleSentence(level,word,mask){
-  const[x,y,size]=level.letter,cy=y+size/2,[prefix,suffix]=sentenceParts(level);
+  const[x,y,size]=level.letter,{x:bx,y:by,size:bs}=inputBox(level),cy=by+bs/2,[prefix,suffix]=sentenceParts(level);
+  if(mask)ctx.drawImage(mask.canvas,x,y);else if(isHan(word))ctx.drawImage(makeGlyph(word,size).canvas,x,y);
+  if(bs!==size&&isHan(word)){rect(bx-6,by-6,bs+12,bs+12,'#101d31ed');ctx.drawImage(makeGlyph(word,bs).canvas,bx,by);}
   ctx.save();ctx.font='18px PixelJP,monospace';ctx.textBaseline='middle';ctx.fillStyle='#91bad0';
-  ctx.textAlign='right';ctx.fillText(prefix,x-12,cy,Math.max(1,x-20));ctx.textAlign='left';ctx.fillText(suffix,x+size+12,cy,Math.max(1,WIDTH-x-size-20));ctx.restore();
-  if(mask)ctx.drawImage(mask.canvas,x,y);else if(isHan(word))ctx.drawImage(makeGlyph(word,size).canvas,x,y);else if(word)text(word,x+size/2,cy,Math.min(45,size/Math.max(1,Array.from(word).length)),'#ffb49d','PixelJP,monospace');
+  ctx.textAlign='right';ctx.fillText(prefix,bx-12,cy,Math.max(1,bx-20));ctx.textAlign='left';ctx.fillText(suffix,bx+bs+12,cy,Math.max(1,WIDTH-bx-bs-20));ctx.restore();
+  if(word&&!isHan(word))text(word,bx+bs/2,cy,Math.min(45,bs/Math.max(1,Array.from(word).length)),'#ffb49d','PixelJP,monospace');
 }
 function drawEditorScene(){
-  const level=editor.document.data;drawGround(level);drawRuleSentence(level,level.word);
+  const level=editor.document.data;drawGround(level);drawObjects(level,true);drawRuleSentence(level,level.word);
   const[x,y,size]=level.letter;ctx.save();ctx.strokeStyle='#ffcf76';ctx.setLineDash([4,5]);ctx.strokeRect(x,y,size,size);ctx.restore();
   const[sx,sy]=level.start;rect(sx,sy-30,18,30,'#ffe0a4');text('START',sx+9,sy-43,11,'#ffe0a4','PixelJP,monospace');drawGoal(level);
   if(editor.drag){const r=editor.groundRect(editor.drag.start,editor.drag.end);rect(r.x,r.y,r.w,r.h,'#8bf6cb55');ctx.strokeStyle='#b9ffe0';ctx.strokeRect(r.x,r.y,r.w,r.h);}
@@ -224,7 +243,7 @@ function drawEditorScene(){
 function draw(){
   if(!game)return;drawBackground();
   if(editor&&editor.editing){drawEditorScene();return;}
-  drawGround();
+  drawGround();drawObjects();
   const draft=$('#rule-word').value.trim(),pending=!game.running&&!game.won&&draft!==game.word;
   drawRuleSentence(game.level,pending?draft:game.word,pending?null:game.placed[0]?.mask);
   const[sx,sy]=game.level.start;text('START',sx+8,sy+15,8,'#8eafc0','PixelJP,monospace');drawGoal();drawPlayer();

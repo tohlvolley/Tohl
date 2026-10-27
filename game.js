@@ -33,13 +33,13 @@ function makeGlyph(char,size){
 }
 function updateJumpCounter(){
   if(!game)return;
-  const text=`残り ${game.jumpsLeft} / ${game.rules.jumpCount} 回`;
+  const text=game.word?`残り ${game.jumpsLeft} / ${game.rules.jumpCount} 回`:'残り — 回';
   if($('#jump-counter').textContent!==text)$('#jump-counter').textContent=text;
 }
 function validateDraft(){
   const field=$('#rule-word'),note=$('#rule-validation'),result=evaluateRule(game.level.ruleText||game.level.ruleKind,field.value);
   const designing=editor&&editor.editing,pending=result.ok&&result.word!==game.word;
-  field.setAttribute('aria-invalid',String(!composition&&!result.ok));note.classList.toggle('error',!composition&&!result.ok);
+  field.setAttribute('aria-invalid',String(!!field.value.trim()&&!composition&&!result.ok));note.classList.toggle('error',!composition&&!result.ok);
   if(composition)note.textContent='変換を確定してから反映できます。';
   else if(!result.ok)note.textContent=result.message;
   else note.textContent=pending?'未反映：確定すると漢字が変わり、旅人と残り回数がスタートの状態に戻ります。':'適用中：ステージの空欄をクリックして書きかえられます。';
@@ -68,10 +68,10 @@ function updateUI(){
   syncWorldInput();validateDraft();updateJumpCounter();
 }
 function syncPlayField(){composition=false;$('#rule-word').value=game.word;syncWorldInput();}
-function loadLevel(index){clearInput();const assigned=editor&&editor.store.assigned(index);if(assigned){game.loadCustom(assigned);game.index=index;}else game.load(index);syncPlayField();updateUI();tell(game.level.hint);}
+function loadLevel(index){clearInput();const assigned=editor&&editor.store.assigned(index);if(assigned){game.loadCustom(assigned);game.index=index;}else game.load(index);game.prepareInput();syncPlayField();updateUI();tell(game.level.hint);}
 function loadCustomStage(level){
   const next=new Game(0,makeGlyph),result=next.loadCustom(level);if(!result.ok)return result;
-  game=next;clearInput();syncPlayField();updateUI();return result;
+  next.prepareInput();game=next;clearInput();syncPlayField();updateUI();return result;
 }
 function restartLevel(){if(game.index>=0)loadLevel(game.index);else{loadCustomStage(game.level);updateUI();}}
 function pointerPosition(event){const r=canvas.getBoundingClientRect();return {x:(event.clientX-r.left)/r.width*WIDTH,y:(event.clientY-r.top)/r.height*HEIGHT};}
@@ -213,7 +213,7 @@ function drawRuleSentence(level,word,mask){
   const[x,y,size]=level.letter,cy=y+size/2,[prefix,suffix]=sentenceParts(level);
   ctx.save();ctx.font='18px PixelJP,monospace';ctx.textBaseline='middle';ctx.fillStyle='#91bad0';
   ctx.textAlign='right';ctx.fillText(prefix,x-12,cy,Math.max(1,x-20));ctx.textAlign='left';ctx.fillText(suffix,x+size+12,cy,Math.max(1,WIDTH-x-size-20));ctx.restore();
-  if(mask)ctx.drawImage(mask.canvas,x,y);else if(isHan(word))ctx.drawImage(makeGlyph(word,size).canvas,x,y);else text(word||'?',x+size/2,cy,Math.min(45,size/Math.max(1,Array.from(word).length)),'#ffb49d','PixelJP,monospace');
+  if(mask)ctx.drawImage(mask.canvas,x,y);else if(isHan(word))ctx.drawImage(makeGlyph(word,size).canvas,x,y);else if(word)text(word,x+size/2,cy,Math.min(45,size/Math.max(1,Array.from(word).length)),'#ffb49d','PixelJP,monospace');
 }
 function drawEditorScene(){
   const level=editor.document.data;drawGround(level);drawRuleSentence(level,level.word);
@@ -226,7 +226,7 @@ function draw(){
   if(editor&&editor.editing){drawEditorScene();return;}
   drawGround();
   const draft=$('#rule-word').value.trim(),pending=!game.running&&!game.won&&draft!==game.word;
-  drawRuleSentence(game.level,pending?draft:game.word,pending?null:game.placed[0].mask);
+  drawRuleSentence(game.level,pending?draft:game.word,pending?null:game.placed[0]?.mask);
   const[sx,sy]=game.level.start;text('START',sx+8,sy+15,8,'#8eafc0','PixelJP,monospace');drawGoal();drawPlayer();
 }
 function onWin(){
@@ -248,7 +248,7 @@ async function bootstrap(){
   try{await document.fonts.load('16px PixelJP','漢字');}catch{}
   if(!fontLoaded)glyphFont='"Hiragino Sans","Noto Sans CJK JP",sans-serif';
   game=new Game(0,makeGlyph);
-  editor=new window.KotonohaEditor.StageEditor({makeGlyph,notify:tell,getLevel:()=>({...game.level,word:game.word}),onBegin:()=>{clearInput();game.running=false;editorOriginalGame=game;},onClose:()=>{if(editorOriginalGame){game=editorOriginalGame;editorOriginalGame=null;if(game.index>=0)loadLevel(game.index);}clearInput();syncPlayField();updateUI();setScreen('home');},onChange:()=>{if(editor&&editor.editing){clearInput();game.running=false;setScreen('editor');}else if(editor&&editor.testing)setScreen('play');updateUI();},loadStage:loadCustomStage});
+  editor=new window.KotonohaEditor.StageEditor({makeGlyph,notify:tell,getLevel:()=>({...game.level,word:game.word||game.level.word}),onBegin:()=>{clearInput();game.running=false;editorOriginalGame=game;},onClose:()=>{if(editorOriginalGame){game=editorOriginalGame;editorOriginalGame=null;if(game.index>=0)loadLevel(game.index);}clearInput();syncPlayField();updateUI();setScreen('home');},onChange:()=>{if(editor&&editor.editing){clearInput();game.running=false;setScreen('editor');}else if(editor&&editor.testing)setScreen('play');updateUI();},loadStage:loadCustomStage});
   setupControls();loadLevel(0);
   if(typeof ResizeObserver!=='undefined')new ResizeObserver(syncWorldInput).observe(canvas);else window.addEventListener('resize',syncWorldInput);
   tell(fontLoaded?game.level.hint:'細字フォントを取得できなかったため、端末の字体で遊べます。線と当たり判定には同じ字形を使っています。');

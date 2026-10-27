@@ -164,6 +164,7 @@
       this.rules=this.rulesFor(this.rule);this.respawn();
       if(this.makeGlyph){const[x,y,size]=this.level.letter;this.placed=[{id:this.nextId++,char:this.word,x,y,size,mask:this.makeGlyph(this.word,size)}];}
     }
+    prepareInput(){this.running=false;this.won=false;this.word='';this.placed=[];this.respawn();}
     rulesFor(rule){return {jumpCount:rule.jumpCount===undefined?this.level.baseJumps:rule.jumpCount,gravity:rule.gravity||'並',speed:rule.speed||185,jumpPower:rule.jumpPower||430,width:rule.width||18,height:rule.height||30,color:rule.color||'#ece5cf',opacity:rule.opacity===undefined?1:rule.opacity,round:!!rule.round};}
     respawn(){this.player={x:this.level.start[0],y:this.level.start[1]-this.rules.height,w:this.rules.width,h:this.rules.height,vx:0,vy:0,grounded:false,facing:1,jumpsUsed:0};this.jumpHeld=false;}
     get remaining(){return Math.max(0,1-this.placed.length);}

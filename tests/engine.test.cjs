@@ -108,3 +108,10 @@ test('sentence text outside the glyph is never a physical platform',()=>{
  assert.equal(g.solidAt({x:x-80,y:y+size/2,w:15,h:15}),null);
  assert.equal(g.solidAt({x:x+size+15,y:y+size/2,w:15,h:15}),null);
 });
+
+test('entering a stage clears its input and physical glyph until a valid word is applied',()=>{
+ const game=new Game(0,glyph);game.prepareInput();
+ assert.equal(game.word,'');assert.equal(game.placed.length,0);assert.equal(game.running,false);
+ assert.equal(game.applyRule('').ok,false);assert.equal(game.placed.length,0);
+ assert.equal(game.applyRule('三').ok,true);assert.equal(game.placed.length,1);assert.equal(game.word,'三');assert.equal(game.jumpsLeft,3);
+});

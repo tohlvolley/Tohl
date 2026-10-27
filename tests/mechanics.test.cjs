@@ -68,15 +68,23 @@ test('ground jump plus one air jump is the limit; landing restores only the air 
  tick(g,{},150);assert(g.player.grounded);assert.equal(g.player.airJumpsUsed,0);assert.equal(g.jumpsLeft,4);
  tick(g,{jump:true});assert.equal(g.player.jumpsUsed,3);
 });
-test('background gravity lands on the same skyline roofs that normal gravity passes through',()=>{
- const {CITY_ROOFS,evaluateRule}=require('../engine.js');
+test('depth gravity falls onto existing building faces and supports four-way movement and jumps',()=>{
+ const {citySurfaceAt,depthProjection,evaluateRule}=require('../engine.js');
  assert.equal(evaluateRule('重力の向きが［字］になる。','奥').gravityDirection,'back');
- const roof=CITY_ROOFS.find(r=>r.x>420&&r.x<440),source=custom({word:'奥',bindings:[{word:'奥',property:'gravityDirection',value:'back'}]});
- const g=load(source);g.placed=[];g.player.x=roof.x+2;g.player.y=roof.y-80;g.running=true;tick(g,{},100);
- assert.equal(g.player.y,roof.y-g.player.h);assert(g.player.grounded);assert.equal(g.player.surface,'ビル');
- tick(g,{jump:true});assert(g.player.vy<0);assert.equal(g.player.jumpsUsed,1);
- const normal=load(stage());normal.placed=[];normal.player.x=roof.x+2;normal.player.y=roof.y-80;normal.running=true;tick(normal,{},100);assert(normal.player.y>roof.y);
- const below=load(source);below.placed=[];below.player.x=roof.x+2;below.player.y=roof.y+5;below.player.vy=-430;below.running=true;tick(below,{},8);assert(below.player.y<roof.y);
+ const source=custom({word:'奥',bindings:[{word:'奥',property:'gravityDirection',value:'back'}]}),g=load(source);
+ const before=depthProjection(g.player);g.running=true;tick(g,{},90);assert(g.player.grounded);assert.equal(g.player.surface,'ビル側面');assert(citySurfaceAt(g.level,g.player.depth.x,g.player.depth.y));
+ assert(depthProjection(g.player).scale<before.scale);assert(depthProjection(g.player).y<before.y);
+ let y=g.player.depth.y;tick(g,{up:true},12);assert(g.player.depth.y<y);assert.equal(g.player.jumpsUsed,0);
+ tick(g,{down:true},30);assert(g.player.depth.y>y-1);assert.equal(g.player.jumpsUsed,0);
+ tick(g,{jump:true});assert(g.player.depth.z>0);assert.equal(g.player.jumpsUsed,1);
+ tick(g,{});tick(g,{jump:true});assert.equal(g.player.jumpsUsed,2);tick(g,{});tick(g,{jump:true});assert.equal(g.player.jumpsUsed,2);
+});
+test('depth mode ignores foreground terrain and hazards, falls through building gaps, and resets on failure',()=>{
+ const g=load(custom({word:'奥',bindings:[{word:'奥',property:'gravityDirection',value:'back'}]}));g.running=true;tick(g,{},90);
+ g.player.depth.x=80;g.player.depth.y=340;g.player.grounded=false;g.player.depth.z=0;g.player.depth.vz=0;
+ for(let i=0;i<120&&!g.deaths;i++)tick(g);assert.equal(g.deaths,1);assert.equal(g.running,true);assert.equal(g.word,'奥');assert.equal(g.player.depth.entry,0);
+ const wall=load(custom({word:'奥',bindings:[{word:'奥',property:'gravityDirection',value:'back'}]}));wall.running=true;tick(wall,{},90);
+ wall.level.regions.push({x:0,y:300,w:300,h:200});wall.objects.push({type:'spike',x:0,y:300,w:300,h:200});tick(wall,{},20);assert.equal(wall.deaths,0);assert(wall.player.grounded);
 });
 test('ten default stages include a black stage six; count changes preserve hidden assignments',()=>{
  const {defaultStage}=require('../engine.js');assert.equal(LEVELS.length,10);assert.equal(defaultStage(5).background,'black');assert.equal(defaultStage(19).title,'STAGE 20');

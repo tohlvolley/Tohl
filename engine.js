@@ -9,9 +9,20 @@
     {title:'STAGE 3',chapter:'STAGE 3',kicker:'その意味と、その輪郭を使う。',ruleKind:'body',word:'速',baseJumps:6,letter:[420,260,200],start:[60,420],goal:[920,420],hint:'同じ文でも、別の漢字なら動きも字形も変わる。入力は自由。意味が成立するときだけ反映できる。',regions:[{x:0,y:420,w:240,h:80},{x:760,y:420,w:240,h:80}]},
     {title:'STAGE 4',chapter:'STAGE 4',kicker:'ひとつの字で、道をひらく。',ruleKind:'jumps',word:'五',baseJumps:1,letter:[430,200,200],start:[50,430],goal:[930,180],hint:'置けるのは一文字だけ。跳べる回数と、文字の線のかたち。その両方を考えて高い門を目指そう。',regions:[{x:0,y:430,w:220,h:70},{x:780,y:180,w:220,h:320}]}
   ];
-  // The same roof rectangles drive the visible skyline and background-plane collision.
-  const CITY_BUILDINGS=Array.from({length:13},(_,i)=>{const x=i*86-20,h=30+(i*31)%80;return {x,y:500-h-35,w:74,h:h+35};});
-  const CITY_ROOFS=CITY_BUILDINGS.flatMap(r=>[{x:r.x,y:r.y,w:r.w,h:3},{x:r.x+14,y:r.y-10,w:32,h:3}]);
+  // Visible building faces are also the walkable surfaces of the depth plane.
+  const CITY_BUILDINGS=Array.from({length:9},(_,i)=>{const y=190+(i*47)%100;return {x:i*120-30,y,w:105,h:HEIGHT-y};});
+  function citySurfaceAt(level,x,y){return level.background==='black'?null:CITY_BUILDINGS.find(r=>x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h)||null;}
+  function cityEntryPoint(level,x,y){
+    if(level.background==='black')return {x,y};
+    let nearest=null,best=Infinity;
+    for(const r of CITY_BUILDINGS){const px=Math.max(r.x+7,Math.min(r.x+r.w-7,x)),py=Math.max(r.y+7,Math.min(HEIGHT-7,y)),distance=(x-px)**2+(y-py)**2;if(distance<best){best=distance;nearest={x:Math.max(7,Math.min(WIDTH-7,px)),y:py};}}
+    return nearest;
+  }
+  function depthProjection(player){
+    const d=player.depth;if(!d)return {x:player.x+player.w/2,y:player.y+player.h/2,scale:1};
+    const t=Math.min(1,d.entry),ease=t*t;
+    return {x:d.fromX+(d.x-d.fromX)*ease,y:d.fromY+(d.y+d.z*.4-d.fromY)*ease,scale:(1-.28*ease)*Math.max(.35,1+d.z/600)};
+  }
   for(let index=4;index<10;index++){
     const level=JSON.parse(JSON.stringify(LEVELS[0]));level.title=level.chapter=`STAGE ${index+1}`;level.ruleKind='none';level.word='三';level.baseJumps=8;
     if(index===4){level.regions.push({x:340,y:400,w:100,h:100},{x:570,y:350,w:80,h:150});level.letter=[430,160,140];}
@@ -84,7 +95,7 @@
     speed:{label:'移動速度',min:0,max:600,default:185},
     jumpPower:{label:'ジャンプ力',min:0,max:900,default:430},
     gravityStrength:{label:'重力の強さ',min:0,max:2500,default:1050},
-    gravityDirection:{label:'重力の向き',choices:{down:'下',up:'上',left:'左',right:'右',back:'奥（背景のビルを足場にする）'},default:'down'},
+    gravityDirection:{label:'重力の向き',choices:{down:'下',up:'上',left:'左',right:'右',back:'奥（ビルの側面に立つ）'},default:'down'},
     width:{label:'体の幅',min:4,max:80,default:18},height:{label:'体の高さ',min:8,max:100,default:30},
     color:{label:'体の色',color:true,default:'#000000'},opacity:{label:'体の透明度（1＝不透明）',min:0.1,max:1,default:1}
   };
@@ -132,7 +143,7 @@
       if(template.length>100||template.split('［字］').length!==2)return {ok:false,message:'ルール文には［字］を一つだけ入れてください（100文字以内）。'};
       const normalized=template.replace(/[\s。、！!]/g,'');
       if(/^(?:このステージで|このステージでは|ステージ内で|合計|全部で)?［字］回(?:まで)?(?:飛べる|跳べる|ジャンプできる)$/.test(normalized))kind='jumps';
-      else if(/^重力の向きが［字］になる$/.test(normalized)){const direction={上:'up',下:'down',左:'left',右:'right',奥:'back'}[String(value).trim()];return direction?{ok:true,word:String(value).trim(),gravityDirection:direction,sentence:template.replace('［字］',String(value).trim()),description:direction==='back'?'背景のビルの屋上に着地できます。':''}:{ok:false,message:'この重力の向きは解釈できません。'};}
+      else if(/^重力の向きが［字］になる$/.test(normalized)){const direction={上:'up',下:'down',左:'left',右:'right',奥:'back'}[String(value).trim()];return direction?{ok:true,word:String(value).trim(),gravityDirection:direction,sentence:template.replace('［字］',String(value).trim()),description:direction==='back'?'背景のビルの側面に着地し、4方向に移動できます。':''}:{ok:false,message:'この重力の向きは解釈できません。'};}
       else if(/^(?:体|身体|からだ)が［字］くなる$/.test(normalized))kind='body';
       else return {ok:false,message:'このルール文の意味は未対応です。例：このステージで［字］回まで飛べる。／体が［字］くなる。'};
       const result=evaluateRule(kind,value);
@@ -264,7 +275,7 @@
     }
     prepareInput(){this.running=false;this.won=false;this.word='';this.placed=[];this.rule={ok:true,description:'',sentence:''};this.rules=this.rulesFor({});this.respawn();}
     rulesFor(rule){return {gravityDirection:rule.gravityDirection||'down',gravityStrength:rule.gravityStrength===undefined?GRAVITY[rule.gravity||'並']:rule.gravityStrength,jumpCount:rule.jumpCount===undefined?this.level.baseJumps:rule.jumpCount,gravity:rule.gravity||'並',speed:rule.speed===undefined?185:rule.speed,jumpPower:rule.jumpPower===undefined?430:rule.jumpPower,width:rule.width||18,height:rule.height||30,color:rule.color||'#000000',opacity:rule.opacity===undefined?1:rule.opacity,round:!!rule.round};}
-    respawn(){this.objects=(this.level.objects||[]).map(o=>({...o,used:0,broken:false}));this.player={x:this.level.start[0],y:this.level.start[1]-this.rules.height,w:this.rules.width,h:this.rules.height,vx:0,vy:0,grounded:false,facing:1,jumpsUsed:0,airJumpsUsed:0,climbing:false};this.jumpHeld=false;}
+    respawn(){this.objects=(this.level.objects||[]).map(o=>({...o,used:0,broken:false}));this.player={x:this.level.start[0],y:this.level.start[1]-this.rules.height,w:this.rules.width,h:this.rules.height,vx:0,vy:0,grounded:false,facing:1,jumpsUsed:0,airJumpsUsed:0,climbing:false};this.jumpHeld=false;if(this.rules.gravityDirection==='back'){const fromX=this.player.x+this.player.w/2,fromY=this.player.y+this.player.h/2,target=cityEntryPoint(this.level,fromX,fromY-65);this.player.depth={...target,z:0,vz:0,entry:0,fromX,fromY,facing:0};}}
     get remaining(){return Math.max(0,1-this.placed.length);}
     get jumpsLeft(){return Math.max(0,this.rules.jumpCount-this.player.jumpsUsed);}
     applyRule(value,size){
@@ -304,10 +315,6 @@
       const amount=delta/steps;
       for(let i=0;i<steps;i++){
         const before=p[axis];p[axis]+=amount;
-        if(this.rules.gravityDirection==='back'&&axis==='y'&&delta>0){
-          const roof=CITY_ROOFS.filter(r=>p.x<r.x+r.w&&p.x+p.w>r.x&&before+p.h<=r.y&&p.y+p.h>=r.y).sort((a,b)=>a.y-b.y)[0];
-          if(roof){p.y=roof.y-p.h;p.vy=0;p.grounded=true;p.surface='ビル';p.airJumpsUsed=0;break;}
-        }
         const collision=this.solidAt(p);
         if(!collision)continue;
         if(axis===(this.rules.gravityDirection==='left'||this.rules.gravityDirection==='right'?'y':'x')&&p.grounded){
@@ -322,13 +329,31 @@
         break;
       }
     }
-    backgroundSupport(p){return this.rules.gravityDirection==='back'&&p.vy>=0&&CITY_ROOFS.some(r=>p.x<r.x+r.w&&p.x+p.w>r.x&&Math.abs(p.y+p.h-r.y)<2);}
+    stepDepth(dt,input){
+      const p=this.player,d=p.depth;this.elapsed+=dt;
+      let dx=(input.right?1:0)-(input.left?1:0),dy=(input.down?1:0)-(input.up?1:0);const length=Math.hypot(dx,dy);if(length){dx/=length;dy/=length;d.facing=Math.abs(dx)>Math.abs(dy)?(dx>0?Math.PI/2:-Math.PI/2):(dy>0?Math.PI:0);}
+      const approach=(value,target,amount)=>value+Math.max(-amount,Math.min(amount,target-value));
+      p.vx=approach(p.vx,dx*this.rules.speed,(dx?2000:2200)*dt);p.vy=approach(p.vy,dy*this.rules.speed,(dy?2000:2200)*dt);
+      d.x+=p.vx*dt;d.y+=p.vy*dt;
+      if(d.entry<1){d.entry=Math.min(1,d.entry+dt/.65);p.grounded=false;if(d.entry===1){if(citySurfaceAt(this.level,d.x,d.y)){p.grounded=true;p.surface='ビル側面';}else {d.z=-1;d.vz=-30;}}this.jumpHeld=!!input.jump;}
+      else {
+        const surface=citySurfaceAt(this.level,d.x,d.y);if(p.grounded&&!surface)p.grounded=false;
+        if(input.jump&&!this.jumpHeld&&p.jumpsUsed<this.rules.jumpCount&&(p.grounded||p.airJumpsUsed<1)){if(!p.grounded)p.airJumpsUsed++;p.grounded=false;d.vz=this.rules.jumpPower;p.jumpsUsed++;}
+        this.jumpHeld=!!input.jump;
+        if(!p.grounded){const previous=d.z;d.vz-=this.rules.gravityStrength*dt;d.z+=d.vz*dt;if(previous>=0&&d.z<=0&&surface){d.z=0;d.vz=0;p.grounded=true;p.surface='ビル側面';p.airJumpsUsed=0;}}
+        if(d.z< -130||d.x< -30||d.x>WIDTH+30||d.y< -30||d.y>HEIGHT+30){this.die('ビルの側面から落下しました。');return;}
+        const goal=cityEntryPoint(this.level,this.level.goal[0],this.level.goal[1]-80);
+        if(p.grounded&&Math.hypot(d.x-goal.x,d.y-goal.y)<18){this.won=true;this.running=false;this.lastEvent='win';}
+      }
+      p.x=d.x-p.w/2;p.y=d.y-p.h/2;
+    }
     gravityVector(){return {down:[0,1],up:[0,-1],left:[-1,0],right:[1,0],back:[0,1]}[this.rules.gravityDirection];}
     die(message){this.deaths++;this.respawn();this.running=true;this.elapsed=0;this.lastFailure=message;this.lastEvent='restart';}
     step(dt,input={}){
       if(!this.running||this.won)return;
+      if(this.rules.gravityDirection==='back'){this.stepDepth(dt,input);return;}
       this.elapsed+=dt;const p=this.player,[gx,gy]=this.gravityVector();
-      if(p.grounded||p.climbing||this.solidAt({...p,x:p.x+gx,y:p.y+gy})||this.backgroundSupport(p))p.airJumpsUsed=0;
+      if(p.grounded||p.climbing||this.solidAt({...p,x:p.x+gx,y:p.y+gy}))p.airJumpsUsed=0;
       const vine=this.objects.some(o=>o.type==='vine'&&intersects(p,o));
       if(!vine)p.climbing=false;
       if(vine&&(input.up||input.down))p.climbing=true;
@@ -336,7 +361,7 @@
       if(direction){p[tangent]=Math.max(-this.rules.speed,Math.min(this.rules.speed,p[tangent]+direction*2000*dt));p.facing=direction;}
       else p[tangent]=Math.sign(p[tangent])*Math.max(0,Math.abs(p[tangent])-2200*dt);
       const jumping=!!input.jump||!!input.up&&!vine;
-      if(jumping&&!this.jumpHeld&&p.jumpsUsed<this.rules.jumpCount&&(p.grounded||p.climbing||this.solidAt({...p,x:p.x+gx,y:p.y+gy})||this.backgroundSupport(p)||p.airJumpsUsed<1)){if(!p.grounded&&!p.climbing&&!this.solidAt({...p,x:p.x+gx,y:p.y+gy})&&!this.backgroundSupport(p))p.airJumpsUsed++;if(gx)p.vx=-gx*this.rules.jumpPower;else p.vy=-gy*this.rules.jumpPower;p.grounded=false;p.climbing=false;p.jumpsUsed++;}
+      if(jumping&&!this.jumpHeld&&p.jumpsUsed<this.rules.jumpCount&&(p.grounded||p.climbing||this.solidAt({...p,x:p.x+gx,y:p.y+gy})||p.airJumpsUsed<1)){if(!p.grounded&&!p.climbing&&!this.solidAt({...p,x:p.x+gx,y:p.y+gy}))p.airJumpsUsed++;if(gx)p.vx=-gx*this.rules.jumpPower;else p.vy=-gy*this.rules.jumpPower;p.grounded=false;p.climbing=false;p.jumpsUsed++;}
       this.jumpHeld=jumping;
       if(p.climbing){p.vx=direction*this.rules.speed;p.vy=((input.down?1:0)-(input.up?1:0))*140;}
       else {p.vx=Math.max(-650,Math.min(650,p.vx+gx*this.rules.gravityStrength*dt));p.vy=Math.max(-650,Math.min(650,p.vy+gy*this.rules.gravityStrength*dt));}
@@ -345,7 +370,6 @@
       else {p.grounded=grounded;this.moveAxis(p.vy*dt,'y');p.grounded=false;this.moveAxis(p.vx*dt,'x');}
       if(p.x<0||p.x>WIDTH-p.w){if(gx)p.grounded=true;p.x=Math.max(0,Math.min(WIDTH-p.w,p.x));p.vx=0;}
       if(p.y<0){p.y=0;p.vy=0;if(gy<0)p.grounded=true;}
-      if(this.backgroundSupport(p))p.grounded=true;
       if(p.grounded)p.airJumpsUsed=0;
       if(p.vx*gx+p.vy*gy>=0&&this.solidAt({...p,x:p.x+gx*2,y:p.y+gy*2}))p.grounded=true;
       if(this.objects.some(o=>o.type==='spike'&&spikeIntersects(p,o))){this.die('トゲに触れました。やり直してください。');return;}
@@ -357,6 +381,6 @@
       if(intersects(p,{x:goalX-18,y:goalY-64,w:36,h:64})){this.won=true;this.running=false;this.lastEvent='win';}
     }
   }
-  const api={Game,LEVELS,defaultStage,CITY_BUILDINGS,CITY_ROOFS,WIDTH,HEIGHT,GRAVITY,isHan,parseNumber,evaluateRule,evaluateStageRule,validateBindings,EFFECTS,inputBox,sentenceParts,validateStage,spikeTriangles,spikeIntersects,buildMask,maskIntersects};
+  const api={Game,LEVELS,defaultStage,CITY_BUILDINGS,citySurfaceAt,cityEntryPoint,depthProjection,WIDTH,HEIGHT,GRAVITY,isHan,parseNumber,evaluateRule,evaluateStageRule,validateBindings,EFFECTS,inputBox,sentenceParts,validateStage,spikeTriangles,spikeIntersects,buildMask,maskIntersects};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Kotonoha=api;
 })(typeof window!=='undefined'?window:globalThis);

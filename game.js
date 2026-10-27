@@ -1,5 +1,5 @@
 'use strict';
-const {Game,LEVELS,defaultStage,CITY_BUILDINGS,CITY_ROOFS,spikeTriangles,WIDTH,HEIGHT,evaluateStageRule,inputBox,sentenceParts,isHan,buildMask}=window.Kotonoha;
+const {Game,LEVELS,defaultStage,CITY_BUILDINGS,cityEntryPoint,depthProjection,spikeTriangles,WIDTH,HEIGHT,evaluateStageRule,inputBox,sentenceParts,isHan,buildMask}=window.Kotonoha;
 const $=selector=>document.querySelector(selector);
 const canvas=$('#world'),ctx=canvas.getContext('2d');
 let game,editor,editorOriginalGame=null,clock=0,previous=0,accumulator=0,composition=false,jumpQueued=false,completed=new Set();
@@ -166,29 +166,39 @@ function rect(x,y,w,h,fill,r=0){
 function line(x1,y1,x2,y2,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();}
 function text(value,x,y,size,color,font='serif'){ctx.font=`${size}px ${font}`;ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(value,x,y);}
 function drawBackground(){
-  const level=editor&&editor.editing?editor.document.data:game.level;if(level.background==='black'){rect(0,0,1000,500,'#000000');if(game.rules.gravityDirection==='back'&&!(editor&&editor.editing))drawCityBuildings(true);return;}
+  const level=editor&&editor.editing?editor.document.data:game.level;if(level.background==='black'){rect(0,0,1000,500,'#000000');return;}
   rect(0,0,1000,500,'#101d31');
   for(let x=0;x<1000;x+=25)line(x,0,x,500,'#20374e45');
   for(let y=0;y<500;y+=25)line(0,y,1000,y,'#20374e45');
   for(let i=0;i<36;i++){const x=(i*137+17)%1000,y=(i*71+51)%270;rect(x,y,i%5===0?3:2,i%5===0?3:2,i%5===0?'#7badc7':'#42647e');}
   // Stepped silhouettes and a square moon keep the scenery on the pixel grid.
   rect(800,55,48,48,'#324d67');rect(809,55,39,39,'#a5d5d3');rect(800,64,39,39,'#c4e6d8');
-  for(let i=0;i<19;i++){const x=i*60-40,h=35+(i*47)%115;rect(x,500-h-80,56,h+80,'#172c42');rect(x+8,500-h-92,30,12,'#172c42');}
-  drawCityBuildings(game.rules.gravityDirection==='back'&&!(editor&&editor.editing));
+  drawCityBuildings();
   line(0,475,1000,475,'#2e6b7950');
 }
-function drawCityBuildings(solid){
-  for(const r of CITY_BUILDINGS){rect(r.x,r.y,r.w,r.h,solid?'#365365':'#1c3549');rect(r.x+14,r.y-10,32,10,solid?'#365365':'#1c3549');}
-  if(solid)for(const roof of CITY_ROOFS)rect(roof.x,roof.y,roof.w,3,'#a3c7ca');
+function drawCityBuildings(){
+  for(const r of CITY_BUILDINGS){
+    rect(r.x,r.y,r.w,r.h,'#1c3549');rect(r.x,r.y,3,r.h,'#24445a');rect(r.x,r.y,r.w,3,'#2a4a60');
+    for(let x=r.x+12;x<r.x+r.w-8;x+=20)for(let y=r.y+16;y<HEIGHT;y+=30)rect(x,y,5,8,'#28475a');
+  }
+}
+function drawDepthPlayer(){
+  const p=game.player,d=p.depth;if(!d)return;const point=depthProjection(p),u=Math.max(1,Math.round(p.w*point.scale/7)),hood=u*5,color=game.rules.color;
+  ctx.save();ctx.globalAlpha=game.rules.opacity;ctx.translate(Math.round(point.x),Math.round(point.y));ctx.rotate(d.facing);
+  const stride=game.running&&Math.hypot(p.vx,p.vy)>8?Math.round(Math.sin(clock*16)*u):0;
+  // Seen from the head: hood in the centre, shoulders, hands and tied cloth behind it.
+  rect(-hood/2-u,-u,u,3*u+stride,color);rect(hood/2,-u,u,3*u-stride,color);
+  rect(-2*u,2*u+stride,u*2,u*2,color);rect(u,2*u-stride,u*2,u*2,color);
+  rect(-hood/2,-hood/2,hood,hood,color);rect(-hood/2-u,-u,hood+2*u,2*u,color);
+  rect(-u,hood/2,u,3*u,color);rect(0,hood/2+2*u,3*u,u,color);ctx.restore();
 }
 function drawPlayer(){
+  if(game.rules.gravityDirection==='back'){drawDepthPlayer();return;}
   const p=game.player,w=p.w,h=p.h,u=Math.max(1,Math.round(w/7)),moving=game.running&&Math.abs(p.vx)>8,air=!p.grounded&&!p.climbing;
   const stride=moving?Math.sin(clock*18):0,lean=moving?p.facing*u:0,x=Math.round(p.x),y=Math.round(p.y)+(moving&&!air?u:0),head=Math.round(h*.3),color=game.rules.color;
   ctx.save();ctx.globalAlpha=game.rules.opacity;
-  // Hood, face slit, tied headband and trailing cloth; rule colour dyes the whole outfit.
+  // Hood, tied headband and trailing cloth share the rule-selected outfit colour.
   rect(x+u+lean,y,w-u*2,head,color);rect(x+lean,y+u,w,head-u,color);
-  rect(x+u+lean,y+Math.max(2,Math.floor(head*.45)),w-u*2,Math.max(2,u),'#17212b');
-  rect(x+lean+(p.facing>0?w-u*3:u*2),y+Math.max(2,Math.floor(head*.45)),u,Math.max(1,u),'#e9f2df');
   const tailX=p.facing>0?x-u*3:x+w;rect(tailX,y+head-u,u*3,u,color);rect(tailX+(p.facing>0?-u:u*2),y+head+Math.round(Math.sin(clock*13)*u),u*2,u,color);
   const bodyY=y+head,bodyH=Math.max(4,Math.round(h*.4));rect(x+u,bodyY,w-u*2,bodyH,color);
   if(p.climbing){rect(x-u,bodyY-u,u*2,bodyH,color);rect(x+w-u,bodyY-u*2,u*2,bodyH,color);}
@@ -215,6 +225,7 @@ function drawGround(level=game.level){
   ctx.drawImage(terrainImages.get(level.regions),0,0);
 }
 function drawGoal(level=game.level){
+  if(game.rules.gravityDirection==='back'&&!(editor&&editor.editing)&&level===game.level){const goal=cityEntryPoint(level,level.goal[0],level.goal[1]-80);ctx.strokeStyle='#83d4d7';ctx.lineWidth=2;ctx.strokeRect(goal.x-10,goal.y-10,20,20);text('EXIT',goal.x,goal.y-20,9,'#83d4d7','PixelJP,monospace');return;}
   const[px,py]=level.goal,blink=Math.floor(clock*3)%2;
   rect(px-25,py-70,50,70,'#19394b');rect(px-25,py-70,5,70,'#66d7e0');rect(px+20,py-70,5,70,'#66d7e0');rect(px-25,py-70,50,5,'#a6f4ed');
   for(let y=py-59;y<py-6;y+=8)rect(px-15,y,30,2,'#4d9aa54d');
@@ -241,7 +252,8 @@ function drawObjects(level=game.level,editing=false){
 }
 function drawRuleSentence(level,word,mask){
   const[x,y,size]=level.letter,{x:bx,y:by,size:bs}=inputBox(level),cy=by+bs/2,[prefix,suffix]=sentenceParts(level);
-  if(mask)ctx.drawImage(mask.canvas,x,y);else if(isHan(word))ctx.drawImage(makeGlyph(word,size).canvas,x,y);
+  ctx.save();if(level===game.level&&game.rules.gravityDirection==='back'&&!(editor&&editor.editing))ctx.globalAlpha*=.22;
+  if(mask)ctx.drawImage(mask.canvas,x,y);else if(isHan(word))ctx.drawImage(makeGlyph(word,size).canvas,x,y);ctx.restore();
   if(bs!==size&&isHan(word)){rect(bx-6,by-6,bs+12,bs+12,'#101d31ed');ctx.drawImage(makeGlyph(word,bs).canvas,bx,by);}
   ctx.save();ctx.font='18px PixelJP,monospace';ctx.textBaseline='middle';ctx.fillStyle='#91bad0';
   ctx.textAlign='right';ctx.fillText(prefix,bx-12,cy,Math.max(1,bx-20));ctx.textAlign='left';ctx.fillText(suffix,bx+bs+12,cy,Math.max(1,WIDTH-bx-bs-20));ctx.restore();
@@ -256,7 +268,7 @@ function drawEditorScene(){
 function draw(){
   if(!game)return;drawBackground();
   if(editor&&editor.editing){drawEditorScene();return;}
-  drawGround();drawObjects();
+  ctx.save();if(game.rules.gravityDirection==='back')ctx.globalAlpha=.22;drawGround();drawObjects();ctx.restore();
   const draft=$('#rule-word').value.trim(),pending=!game.running&&!game.won&&draft!==game.word;
   drawRuleSentence(game.level,pending?draft:game.word,pending?null:game.placed[0]?.mask);
   const[sx,sy]=game.level.start;text('START',sx+8,sy+15,8,'#8eafc0','PixelJP,monospace');drawGoal();drawPlayer();

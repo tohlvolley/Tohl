@@ -9,6 +9,20 @@
     {title:'STAGE 3',chapter:'STAGE 3',kicker:'その意味と、その輪郭を使う。',ruleKind:'body',word:'速',baseJumps:6,letter:[420,260,200],start:[60,420],goal:[920,420],hint:'同じ文でも、別の漢字なら動きも字形も変わる。入力は自由。意味が成立するときだけ反映できる。',regions:[{x:0,y:420,w:240,h:80},{x:760,y:420,w:240,h:80}]},
     {title:'STAGE 4',chapter:'STAGE 4',kicker:'ひとつの字で、道をひらく。',ruleKind:'jumps',word:'五',baseJumps:1,letter:[430,200,200],start:[50,430],goal:[930,180],hint:'置けるのは一文字だけ。跳べる回数と、文字の線のかたち。その両方を考えて高い門を目指そう。',regions:[{x:0,y:430,w:220,h:70},{x:780,y:180,w:220,h:320}]}
   ];
+  // The same roof rectangles drive the visible skyline and background-plane collision.
+  const CITY_BUILDINGS=Array.from({length:13},(_,i)=>{const x=i*86-20,h=30+(i*31)%80;return {x,y:500-h-35,w:74,h:h+35};});
+  const CITY_ROOFS=CITY_BUILDINGS.flatMap(r=>[{x:r.x,y:r.y,w:r.w,h:3},{x:r.x+14,y:r.y-10,w:32,h:3}]);
+  for(let index=4;index<10;index++){
+    const level=JSON.parse(JSON.stringify(LEVELS[0]));level.title=level.chapter=`STAGE ${index+1}`;level.ruleKind='none';level.word='三';level.baseJumps=8;
+    if(index===4){level.regions.push({x:340,y:400,w:100,h:100},{x:570,y:350,w:80,h:150});level.letter=[430,160,140];}
+    if(index===5)level.background='black';
+    if(index===6)level.objects=[{type:'vine',x:320,y:150,w:50,h:270},{type:'vine',x:620,y:150,w:50,h:270}];
+    if(index===7)level.objects=[{type:'crumble',x:320,y:400,w:100,h:25,delay:2},{type:'crumble',x:570,y:400,w:100,h:25,delay:2}];
+    if(index===8)level.objects=[{type:'spike',x:170,y:395,w:50,h:25},{type:'spike',x:780,y:395,w:50,h:25}];
+    if(index===9){level.ruleKind='custom';level.ruleText='重力の向きが［字］になる。';level.word='奥';level.bindings=[{word:'奥',property:'gravityDirection',value:'back'},{word:'下',property:'gravityDirection',value:'down'}];}
+    LEVELS.push(level);
+  }
+  function defaultStage(index){const source=LEVELS[index]||LEVELS[0];const level=JSON.parse(JSON.stringify(source));if(index>=LEVELS.length)level.title=level.chapter=`STAGE ${index+1}`;return level;}
   const BODY_RULES={
     軽:{gravity:'軽',description:'重力が弱まり、ふわりと高く跳べる。'},
     重:{gravity:'重',description:'重力が強まり、落下が速くなる。'},
@@ -70,7 +84,7 @@
     speed:{label:'移動速度',min:0,max:600,default:185},
     jumpPower:{label:'ジャンプ力',min:0,max:900,default:430},
     gravityStrength:{label:'重力の強さ',min:0,max:2500,default:1050},
-    gravityDirection:{label:'重力の向き',choices:{down:'下',up:'上',left:'左',right:'右'},default:'down'},
+    gravityDirection:{label:'重力の向き',choices:{down:'下',up:'上',left:'左',right:'右',back:'奥（背景のビルを足場にする）'},default:'down'},
     width:{label:'体の幅',min:4,max:80,default:18},height:{label:'体の高さ',min:8,max:100,default:30},
     color:{label:'体の色',color:true,default:'#ece5cf'},opacity:{label:'体の透明度（1＝不透明）',min:0.1,max:1,default:1}
   };
@@ -118,6 +132,7 @@
       if(template.length>100||template.split('［字］').length!==2)return {ok:false,message:'ルール文には［字］を一つだけ入れてください（100文字以内）。'};
       const normalized=template.replace(/[\s。、！!]/g,'');
       if(/^(?:このステージで|このステージでは|ステージ内で|合計|全部で)?［字］回(?:まで)?(?:飛べる|跳べる|ジャンプできる)$/.test(normalized))kind='jumps';
+      else if(/^重力の向きが［字］になる$/.test(normalized)){const direction={上:'up',下:'down',左:'left',右:'right',奥:'back'}[String(value).trim()];return direction?{ok:true,word:String(value).trim(),gravityDirection:direction,sentence:template.replace('［字］',String(value).trim()),description:direction==='back'?'背景のビルの屋上に着地できます。':''}:{ok:false,message:'この重力の向きは解釈できません。'};}
       else if(/^(?:体|身体|からだ)が［字］くなる$/.test(normalized))kind='body';
       else return {ok:false,message:'このルール文の意味は未対応です。例：このステージで［字］回まで飛べる。／体が［字］くなる。'};
       const result=evaluateRule(kind,value);
@@ -197,13 +212,13 @@
       if(!mask||!mask.ink)return fail('この漢字の字形を表示できません。');
       if(letter[2]<=200&&(regions.some(r=>maskIntersects(mask,letter[0],letter[1],r))||maskIntersects(mask,letter[0],letter[1],{x:sx,y:sy-h,w,h})||maskIntersects(mask,letter[0],letter[1],{x:gx-18,y:gy-64,w:36,h:64})))return fail('入力欄の文字が地面・スタート・ゴールに重なっています。');
     }
-    const level={title:source.title.trim(),chapter:'自作',kicker:'あなたがつくった、一文字の世界。',hint:'ステージ内の空欄を書きかえて、出口を目指そう。',bindings:source.ruleKind==='custom'?validateBindings(source.bindings).bindings:undefined,objects,ruleText:source.ruleText||undefined,ruleKind:source.ruleKind,word:rule.word,baseJumps,letter:[...letter],start:[sx,sy],goal:[gx,gy],regions};
+    const level={background:source.background==='black'?'black':'city',title:source.title.trim(),chapter:'自作',kicker:'あなたがつくった、一文字の世界。',hint:'ステージ内の空欄を書きかえて、出口を目指そう。',bindings:source.ruleKind==='custom'?validateBindings(source.bindings).bindings:undefined,objects,ruleText:source.ruleText||undefined,ruleKind:source.ruleKind,word:rule.word,baseJumps,letter:[...letter],start:[sx,sy],goal:[gx,gy],regions};
     return {ok:true,level};
   }
   class Game{
     constructor(index=0,makeGlyph){this.makeGlyph=makeGlyph;this.load(index);}
     load(index){
-      this.initialize(index,LEVELS[index]);
+      this.initialize(index,defaultStage(index));
     }
     loadCustom(source){
       const result=validateStage(source,this.makeGlyph);if(!result.ok)return result;
@@ -217,8 +232,8 @@
       if(this.makeGlyph){const[x,y,size]=this.level.letter;this.placed=[{id:this.nextId++,char:this.word,x,y,size,mask:this.makeGlyph(this.word,size)}];}
     }
     prepareInput(){this.running=false;this.won=false;this.word='';this.placed=[];this.rule={ok:true,description:'',sentence:''};this.rules=this.rulesFor({});this.respawn();}
-    rulesFor(rule){return {gravityDirection:rule.gravityDirection||'down',gravityStrength:rule.gravityStrength===undefined?GRAVITY[rule.gravity||'並']:rule.gravityStrength,jumpCount:rule.jumpCount===undefined?this.level.baseJumps:rule.jumpCount,gravity:rule.gravity||'並',speed:rule.speed===undefined?185:rule.speed,jumpPower:rule.jumpPower===undefined?430:rule.jumpPower,width:rule.width||18,height:rule.height||30,color:rule.color||'#ece5cf',opacity:rule.opacity===undefined?1:rule.opacity,round:!!rule.round};}
-    respawn(){this.objects=(this.level.objects||[]).map(o=>({...o,used:0,broken:false}));this.player={x:this.level.start[0],y:this.level.start[1]-this.rules.height,w:this.rules.width,h:this.rules.height,vx:0,vy:0,grounded:false,facing:1,jumpsUsed:0,climbing:false};this.jumpHeld=false;}
+    rulesFor(rule){return {gravityDirection:rule.gravityDirection||'down',gravityStrength:rule.gravityStrength===undefined?GRAVITY[rule.gravity||'並']:rule.gravityStrength,jumpCount:rule.jumpCount===undefined?this.level.baseJumps:rule.jumpCount,gravity:rule.gravity||'並',speed:rule.speed===undefined?185:rule.speed,jumpPower:rule.jumpPower===undefined?430:rule.jumpPower,width:rule.width||18,height:rule.height||30,color:rule.color||'#000000',opacity:rule.opacity===undefined?1:rule.opacity,round:!!rule.round};}
+    respawn(){this.objects=(this.level.objects||[]).map(o=>({...o,used:0,broken:false}));this.player={x:this.level.start[0],y:this.level.start[1]-this.rules.height,w:this.rules.width,h:this.rules.height,vx:0,vy:0,grounded:false,facing:1,jumpsUsed:0,airJumpsUsed:0,climbing:false};this.jumpHeld=false;}
     get remaining(){return Math.max(0,1-this.placed.length);}
     get jumpsLeft(){return Math.max(0,this.rules.jumpCount-this.player.jumpsUsed);}
     applyRule(value,size){
@@ -258,6 +273,10 @@
       const amount=delta/steps;
       for(let i=0;i<steps;i++){
         const before=p[axis];p[axis]+=amount;
+        if(this.rules.gravityDirection==='back'&&axis==='y'&&delta>0){
+          const roof=CITY_ROOFS.filter(r=>p.x<r.x+r.w&&p.x+p.w>r.x&&before+p.h<=r.y&&p.y+p.h>=r.y).sort((a,b)=>a.y-b.y)[0];
+          if(roof){p.y=roof.y-p.h;p.vy=0;p.grounded=true;p.surface='ビル';p.airJumpsUsed=0;break;}
+        }
         const collision=this.solidAt(p);
         if(!collision)continue;
         if(axis===(this.rules.gravityDirection==='left'||this.rules.gravityDirection==='right'?'y':'x')&&p.grounded){
@@ -272,11 +291,13 @@
         break;
       }
     }
-    gravityVector(){return {down:[0,1],up:[0,-1],left:[-1,0],right:[1,0]}[this.rules.gravityDirection];}
+    backgroundSupport(p){return this.rules.gravityDirection==='back'&&p.vy>=0&&CITY_ROOFS.some(r=>p.x<r.x+r.w&&p.x+p.w>r.x&&Math.abs(p.y+p.h-r.y)<2);}
+    gravityVector(){return {down:[0,1],up:[0,-1],left:[-1,0],right:[1,0],back:[0,1]}[this.rules.gravityDirection];}
     die(message){this.deaths++;this.respawn();this.running=false;this.lastEvent=message;}
     step(dt,input={}){
       if(!this.running||this.won)return;
       this.elapsed+=dt;const p=this.player,[gx,gy]=this.gravityVector();
+      if(p.grounded||p.climbing||this.solidAt({...p,x:p.x+gx,y:p.y+gy})||this.backgroundSupport(p))p.airJumpsUsed=0;
       const vine=this.objects.some(o=>o.type==='vine'&&intersects(p,o));
       if(!vine)p.climbing=false;
       if(vine&&(input.up||input.down))p.climbing=true;
@@ -284,7 +305,7 @@
       if(direction){p[tangent]=Math.max(-this.rules.speed,Math.min(this.rules.speed,p[tangent]+direction*1400*dt));p.facing=direction;}
       else p[tangent]=Math.sign(p[tangent])*Math.max(0,Math.abs(p[tangent])-1600*dt);
       const jumping=!!input.jump||!!input.up&&!vine;
-      if(jumping&&!this.jumpHeld&&p.jumpsUsed<this.rules.jumpCount){if(gx)p.vx=-gx*this.rules.jumpPower;else p.vy=-gy*this.rules.jumpPower;p.grounded=false;p.climbing=false;p.jumpsUsed++;}
+      if(jumping&&!this.jumpHeld&&p.jumpsUsed<this.rules.jumpCount&&(p.grounded||p.climbing||this.solidAt({...p,x:p.x+gx,y:p.y+gy})||this.backgroundSupport(p)||p.airJumpsUsed<1)){if(!p.grounded&&!p.climbing&&!this.solidAt({...p,x:p.x+gx,y:p.y+gy})&&!this.backgroundSupport(p))p.airJumpsUsed++;if(gx)p.vx=-gx*this.rules.jumpPower;else p.vy=-gy*this.rules.jumpPower;p.grounded=false;p.climbing=false;p.jumpsUsed++;}
       this.jumpHeld=jumping;
       if(p.climbing){p.vx=direction*this.rules.speed;p.vy=((input.down?1:0)-(input.up?1:0))*140;}
       else {p.vx=Math.max(-650,Math.min(650,p.vx+gx*this.rules.gravityStrength*dt));p.vy=Math.max(-650,Math.min(650,p.vy+gy*this.rules.gravityStrength*dt));}
@@ -293,6 +314,8 @@
       else {p.grounded=grounded;this.moveAxis(p.vy*dt,'y');p.grounded=false;this.moveAxis(p.vx*dt,'x');}
       if(p.x<0||p.x>WIDTH-p.w){if(gx)p.grounded=true;p.x=Math.max(0,Math.min(WIDTH-p.w,p.x));p.vx=0;}
       if(p.y<35){p.y=35;p.vy=0;if(gy<0)p.grounded=true;}
+      if(this.backgroundSupport(p))p.grounded=true;
+      if(p.grounded)p.airJumpsUsed=0;
       if(p.vx*gx+p.vy*gy>=0&&this.solidAt({...p,x:p.x+gx*2,y:p.y+gy*2}))p.grounded=true;
       if(this.objects.some(o=>o.type==='spike'&&intersects(p,o))){this.die('トゲに触れました。やり直してください。');return;}
       for(const object of this.objects){if(object.type!=='crumble'||object.broken)continue;
@@ -303,6 +326,6 @@
       if(intersects(p,{x:goalX-18,y:goalY-64,w:36,h:64})){this.won=true;this.running=false;this.lastEvent='win';}
     }
   }
-  const api={Game,LEVELS,WIDTH,HEIGHT,GRAVITY,isHan,parseNumber,evaluateRule,evaluateStageRule,validateBindings,EFFECTS,inputBox,sentenceParts,validateStage,buildMask,maskIntersects};
+  const api={Game,LEVELS,defaultStage,CITY_BUILDINGS,CITY_ROOFS,WIDTH,HEIGHT,GRAVITY,isHan,parseNumber,evaluateRule,evaluateStageRule,validateBindings,EFFECTS,inputBox,sentenceParts,validateStage,buildMask,maskIntersects};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Kotonoha=api;
 })(typeof window!=='undefined'?window:globalThis);

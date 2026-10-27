@@ -1,11 +1,11 @@
 'use strict';
-const {Game,LEVELS,WIDTH,HEIGHT,evaluateStageRule,inputBox,sentenceParts,isHan,buildMask}=window.Kotonoha;
+const {Game,LEVELS,defaultStage,CITY_BUILDINGS,CITY_ROOFS,WIDTH,HEIGHT,evaluateStageRule,inputBox,sentenceParts,isHan,buildMask}=window.Kotonoha;
 const $=selector=>document.querySelector(selector);
 const canvas=$('#world'),ctx=canvas.getContext('2d');
 let game,editor,editorOriginalGame=null,clock=0,previous=0,accumulator=0,composition=false,jumpQueued=false,completed=new Set();
 const input={left:false,right:false,jump:false,up:false,down:false},glyphCache=new Map();
 let glyphFont='"Kotonoha Thin","Hiragino Sans","Noto Sans CJK JP",sans-serif';
-try{const saved=JSON.parse(localStorage.getItem('kotonoha-one-rule-completed')||'[]');if(Array.isArray(saved))completed=new Set(saved.filter(n=>Number.isInteger(n)&&n>=0&&n<LEVELS.length));}catch{}
+try{const saved=JSON.parse(localStorage.getItem('kotonoha-one-rule-completed')||'[]');if(Array.isArray(saved))completed=new Set(saved.filter(n=>Number.isInteger(n)&&n>=0&&n<100));}catch{}
 function tell(message,error=false){$('#notice').textContent=message;$('#notice').classList.toggle('error',error);}
 function clearInput(){jumpQueued=false;input.left=false;input.right=false;input.jump=false;input.up=false;input.down=false;}
 function makeGlyph(char,size){
@@ -86,19 +86,13 @@ function setScreen(screen){
 }
 function renderStageCards(){
   const holder=$('#stage-cards');holder.replaceChildren();
-  LEVELS.forEach((original,index)=>{
-    const level=editor.store.assigned(index)||original,button=document.createElement('button');
-    button.className='stage-card';button.type='button';button.setAttribute('aria-label',`STAGE ${index+1} ${level.title}`);
-    const preview=document.createElement('canvas');preview.width=400;preview.height=200;preview.setAttribute('aria-hidden','true');
-    const c=preview.getContext('2d');c.scale(.4,.4);c.fillStyle='#101d31';c.fillRect(0,0,WIDTH,HEIGHT);
-    for(const r of level.regions){c.fillStyle='#193c45';c.fillRect(r.x,r.y,r.w,r.h);c.fillStyle='#74c7af';c.fillRect(r.x,r.y,r.w,5);}
-    for(const o of level.objects||[]){c.fillStyle={crumble:'#ca9d62',vine:'#529d70',spike:'#d57485'}[o.type];c.fillRect(o.x,o.y,o.w,o.h);}
-    c.fillStyle='#ece5cf';c.fillRect(level.start[0],level.start[1]-30,18,30);c.strokeStyle='#68cce4';c.lineWidth=5;c.strokeRect(level.goal[0]-23,level.goal[1]-70,46,68);
-    const number=document.createElement('strong');number.textContent=`STAGE ${index+1}`;
-    const title=document.createElement('span');title.textContent=level.title===number.textContent?'':level.title;
-    const status=document.createElement('small');status.textContent=completed.has(index)?'CLEAR':'未クリア';
-    button.append(preview,number,title,status);button.addEventListener('click',()=>{loadLevel(index);setScreen('play');$('#play').focus({preventScroll:true});});holder.append(button);
-  });
+  $('#stage-count').value=editor.store.count();
+  for(let index=0;index<editor.store.count();index++){
+    const button=document.createElement('button');
+    button.className='stage-card';button.type='button';button.setAttribute('aria-label',`STAGE ${index+1}`);
+    const number=document.createElement('strong');number.className='stage-thumbnail';number.textContent=String(index+1);
+    button.append(number);button.addEventListener('click',()=>{loadLevel(index);setScreen('play');$('#play').focus({preventScroll:true});});holder.append(button);
+  }
 }
 function closeStageMenu(resume=false){
   $('#stage-menu').close();
@@ -111,6 +105,7 @@ function openStageMenu(){
   $('#menu-editor').hidden=!editor.testing;$('#stage-menu').showModal();
 }
 function setupControls(){
+  $('#stage-count-save').addEventListener('click',()=>{const result=editor.store.setCount(Number($('#stage-count').value));$('#stage-count-message').textContent=result.ok?'ステージ数を変更しました。各番号への設定は保持されます。':result.message;if(result.ok)renderStageCards();});
   $('#home-stages').disabled=false;$('#home-editor').disabled=false;
   $('#home-stages').addEventListener('click',()=>{setScreen('list');$('#list-title').focus();});
   $('#list-home').addEventListener('click',()=>{setScreen('home');$('#home-stages').focus();});
@@ -140,7 +135,7 @@ function setupControls(){
     if(game.running)canvas.focus({preventScroll:true});
   });
   $('#retry').addEventListener('click',()=>{game.respawn();game.running=false;clearInput();updateUI();tell('スタートへ戻り、ステージの残り回数をリセットしました。');});
-  $('#next-level').addEventListener('click',()=>loadLevel((game.index+1)%LEVELS.length));$('#replay').addEventListener('click',restartLevel);
+  $('#next-level').addEventListener('click',()=>loadLevel((game.index+1)%editor.store.count()));$('#replay').addEventListener('click',restartLevel);
   canvas.addEventListener('pointerdown',e=>{if(e.button!==0||!editor.editing)return;canvas.setPointerCapture(e.pointerId);editor.pointerDown(pointerPosition(e));});
   canvas.addEventListener('pointermove',e=>{if(editor.editing)editor.pointerMove(pointerPosition(e));});
   canvas.addEventListener('pointerup',e=>{if(editor.editing)editor.pointerUp();if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);});
@@ -171,6 +166,7 @@ function rect(x,y,w,h,fill,r=0){
 function line(x1,y1,x2,y2,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();}
 function text(value,x,y,size,color,font='serif'){ctx.font=`${size}px ${font}`;ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(value,x,y);}
 function drawBackground(){
+  const level=editor&&editor.editing?editor.document.data:game.level;if(level.background==='black'){rect(0,0,1000,500,'#000000');if(game.rules.gravityDirection==='back'&&!(editor&&editor.editing))drawCityBuildings(true);return;}
   rect(0,0,1000,500,'#101d31');
   for(let x=0;x<1000;x+=25)line(x,0,x,500,'#20374e45');
   for(let y=0;y<500;y+=25)line(0,y,1000,y,'#20374e45');
@@ -178,22 +174,23 @@ function drawBackground(){
   // Stepped silhouettes and a square moon keep the scenery on the pixel grid.
   rect(800,55,48,48,'#324d67');rect(809,55,39,39,'#a5d5d3');rect(800,64,39,39,'#c4e6d8');
   for(let i=0;i<19;i++){const x=i*60-40,h=35+(i*47)%115;rect(x,500-h-80,56,h+80,'#172c42');rect(x+8,500-h-92,30,12,'#172c42');}
-  for(let i=0;i<13;i++){const x=i*86-20,h=30+(i*31)%80;rect(x,500-h-35,74,h+35,'#1c3549');rect(x+14,500-h-45,32,10,'#1c3549');}
+  drawCityBuildings(game.rules.gravityDirection==='back'&&!(editor&&editor.editing));
   line(0,475,1000,475,'#2e6b7950');
+}
+function drawCityBuildings(solid){
+  for(const r of CITY_BUILDINGS){rect(r.x,r.y,r.w,r.h,solid?'#365365':'#1c3549');rect(r.x+14,r.y-10,32,10,solid?'#365365':'#1c3549');}
+  if(solid)for(const roof of CITY_ROOFS)rect(roof.x,roof.y,roof.w,3,'#a3c7ca');
 }
 function drawPlayer(){
   const p=game.player,x=Math.round(p.x),y=Math.round(p.y),w=p.w,h=p.h;
   const walk=game.running&&Math.abs(p.vx)>10&&p.grounded?Math.floor(clock*10)%2:0;
-  ctx.save();ctx.globalAlpha=game.rules.opacity;
   const unit=Math.max(2,Math.round(w/6)),head=Math.round(h*.32),bodyY=y+head;
-  rect(x,y,w,head,'#d9ebc5');rect(x+unit,y-unit,w-unit*2,unit*2,'#2f6470');
-  rect(x+(p.facing>0?w-unit*2:unit),y+unit,unit,unit,'#142b3b');
-  if(game.rules.round){rect(x+unit,bodyY,w-unit*2,h-head-unit*2,game.rules.color);rect(x,bodyY+unit,w,h-head-unit*4,game.rules.color);}
-  else rect(x,bodyY,w,h-head-unit*2,game.rules.color);
-  rect(x,bodyY,w,unit,'#ff946e');rect(p.facing>0?x-unit*3:x+w,bodyY+unit,unit*3,unit,'#ff946e');
-  rect(x+unit, y+h-unit*(walk?2:1),unit*2,unit*(walk?2:1),'#668bac');
-  rect(x+w-unit*3,y+h-unit*(walk?1:2),unit*2,unit*(walk?1:2),'#668bac');
-  ctx.restore();
+  const color='#000000';
+  rect(x,y,w,head,color);
+  if(game.rules.round){rect(x+unit,bodyY,w-unit*2,h-head-unit*2,color);rect(x,bodyY+unit,w,h-head-unit*4,color);}
+  else rect(x,bodyY,w,h-head-unit*2,color);
+  rect(x+unit,y+h-unit*(walk?2:1),unit*2,unit*(walk?2:1),color);
+  rect(x+w-unit*3,y+h-unit*(walk?1:2),unit*2,unit*(walk?1:2),color);
 }
 function drawGround(level=game.level){
   for(const r of level.regions){
@@ -252,7 +249,7 @@ function onWin(){
   clearInput();if(game.index>=0){completed.add(game.index);try{localStorage.setItem('kotonoha-one-rule-completed',JSON.stringify([...completed]));}catch{}}
   $('#win-title').textContent=game.index>=0?`STAGE ${game.index+1} CLEAR`:'CLEAR';
   $('#win-detail').textContent='';
-  $('#next-level').textContent=game.index===LEVELS.length-1?'STAGE 1 へ':'次の STAGE';updateUI();tell('あなたの文字が、道になりました。別の一文字でも、この文を試してみよう。');
+  $('#next-level').textContent=game.index===editor.store.count()-1?'STAGE 1 へ':'次の STAGE';updateUI();tell('あなたの文字が、道になりました。別の一文字でも、この文を試してみよう。');
 }
 function frame(timestamp){
   const delta=Math.min((timestamp-previous)/1000||0,.05);previous=timestamp;clock+=delta;accumulator+=delta;

@@ -59,3 +59,29 @@ test('creator rules and objects round-trip through files and browser stage assig
  const data=new Map(),store=new StageStore({getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)});assert(store.assign(0,source).ok);assert.deepEqual(store.assigned(0).objects,checked.level.objects);
  for(const objects of [[{type:'unknown',x:1,y:1,w:25,h:25}],[{type:'crumble',x:1,y:1,w:25,h:25,delay:-1}],[{type:'vine',x:990,y:100,w:50,h:50}]])assert.equal(validateStage(stage({objects})).ok,false);
 });
+
+test('ground jump plus one air jump is the limit; landing restores only the air allowance',()=>{
+ const g=load(stage());g.running=true;tick(g,{},2);
+ tick(g,{jump:true});assert.equal(g.player.jumpsUsed,1);assert.equal(g.player.airJumpsUsed,0);
+ tick(g,{});tick(g,{jump:true});assert.equal(g.player.jumpsUsed,2);assert.equal(g.player.airJumpsUsed,1);
+ tick(g,{});tick(g,{jump:true});assert.equal(g.player.jumpsUsed,2);
+ tick(g,{},150);assert(g.player.grounded);assert.equal(g.player.airJumpsUsed,0);assert.equal(g.jumpsLeft,4);
+ tick(g,{jump:true});assert.equal(g.player.jumpsUsed,3);
+});
+test('background gravity lands on the same skyline roofs that normal gravity passes through',()=>{
+ const {CITY_ROOFS,evaluateRule}=require('../engine.js');
+ assert.equal(evaluateRule('重力の向きが［字］になる。','奥').gravityDirection,'back');
+ const roof=CITY_ROOFS.find(r=>r.x>420&&r.x<440),source=custom({word:'奥',bindings:[{word:'奥',property:'gravityDirection',value:'back'}]});
+ const g=load(source);g.placed=[];g.player.x=roof.x+2;g.player.y=roof.y-80;g.running=true;tick(g,{},100);
+ assert.equal(g.player.y,roof.y-g.player.h);assert(g.player.grounded);assert.equal(g.player.surface,'ビル');
+ tick(g,{jump:true});assert(g.player.vy<0);assert.equal(g.player.jumpsUsed,1);
+ const normal=load(stage());normal.placed=[];normal.player.x=roof.x+2;normal.player.y=roof.y-80;normal.running=true;tick(normal,{},100);assert(normal.player.y>roof.y);
+ const below=load(source);below.placed=[];below.player.x=roof.x+2;below.player.y=roof.y+5;below.player.vy=-430;below.running=true;tick(below,{},8);assert(below.player.y<roof.y);
+});
+test('ten default stages include a black stage six; count changes preserve hidden assignments',()=>{
+ const {defaultStage}=require('../engine.js');assert.equal(LEVELS.length,10);assert.equal(defaultStage(5).background,'black');assert.equal(defaultStage(19).title,'STAGE 20');
+ const map=new Map(),storage={getItem:k=>map.get(k)||null,setItem:(k,v)=>map.set(k,v)},store=new StageStore(storage);
+ assert.equal(store.count(),10);assert(store.assign(9,stage()).ok);assert(store.setCount(3).ok);assert.equal(store.count(),3);assert(store.assigned(9));assert(store.setCount(12).ok);assert.equal(store.count(),12);assert(store.assigned(9));
+ assert.equal(store.setCount(0).ok,false);assert.equal(store.setCount(101).ok,false);assert.equal(store.setCount(1.5).ok,false);assert.equal(store.count(),12);
+ const black=decodeStage(encodeStage(stage({background:'black'})).text);assert.equal(black.level.background,'black');
+});

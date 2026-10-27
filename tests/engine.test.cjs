@@ -66,9 +66,9 @@ test('a traveler in 口 lands on the inner bottom stroke',()=>{
 test('the gap between 川 strokes is open all the way through',()=>{
  const g=withGeometry('川');g.player.x=375;g.player.y=215;g.running=true;tick(g,{},60);assert(g.player.y>330);assert.equal(g.player.grounded,false);
 });
-test('三 allows exactly three presses before landing; holding does not repeat',()=>{
- const g=game();g.player.x=650;g.player.y=180;g.running=true;tap(g);assert.equal(g.player.jumpsUsed,1);tick(g,{jump:true},20);assert.equal(g.player.jumpsUsed,2);
- tick(g,{});tap(g);assert.equal(g.player.jumpsUsed,3);tick(g,{},10);const before=g.player.vy;tap(g);assert.equal(g.player.jumpsUsed,3);assert(g.player.vy>before);
+test('only one airborne jump is allowed and holding does not repeat',()=>{
+ const g=game();g.player.x=650;g.player.y=180;g.running=true;tap(g);assert.equal(g.player.jumpsUsed,1);tick(g,{jump:true},20);assert.equal(g.player.jumpsUsed,1);
+ tick(g,{});tap(g);assert.equal(g.player.jumpsUsed,1);assert.equal(g.player.airJumpsUsed,1);
 });
 test('landing never restores the stage budget, and 零 prevents every jump',()=>{
  const g=withGeometry('一');g.player.x=385;g.player.y=200;g.player.jumpsUsed=3;g.running=true;tick(g,{},80);assert.equal(g.jumpsLeft,0);assert(g.player.grounded);

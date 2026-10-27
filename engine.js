@@ -168,6 +168,23 @@
     const p=mask.prefix,s=mask.width+1;
     return p[bottom*s+right]-p[top*s+right]-p[bottom*s+left]+p[top*s+left]>0;
   }
+  const spikeCache=new WeakMap();
+  function spikeTriangles(object){
+    if(spikeCache.has(object))return spikeCache.get(object);
+    const angle=(object.angle||0)*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
+    const unit=[[-.5,.5],[0,-.5],[.5,.5]].map(([x,y])=>[x*c-y*s,x*s+y*c]);
+    const xs=unit.map(p=>p[0]),ys=unit.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),triangles=[];
+    for(let y=object.y;y<object.y+object.h;y+=25)for(let x=object.x;x<object.x+object.w;x+=25){const w=Math.min(25,object.x+object.w-x),h=Math.min(25,object.y+object.h-y),scale=Math.min(w/(maxX-minX),h/(maxY-minY));triangles.push(unit.map(([px,py])=>[x+w/2+(px-(minX+maxX)/2)*scale,y+h/2+(py-(minY+maxY)/2)*scale]));}
+    spikeCache.set(object,triangles);return triangles;
+  }
+  function spikeIntersects(rect,object){
+    if(!intersects(rect,object))return false;
+    const corners=[[rect.x,rect.y],[rect.x+rect.w,rect.y],[rect.x+rect.w,rect.y+rect.h],[rect.x,rect.y+rect.h]];
+    return spikeTriangles(object).some(triangle=>{
+      const axes=[[1,0],[0,1],...triangle.map((p,i)=>{const q=triangle[(i+1)%3];return [p[1]-q[1],q[0]-p[0]];})];
+      return axes.every(([x,y])=>{const a=triangle.map(p=>p[0]*x+p[1]*y),b=corners.map(p=>p[0]*x+p[1]*y);return Math.min(...a)<Math.max(...b)-1e-8&&Math.min(...b)<Math.max(...a)-1e-8;});
+    });
+  }
   function validateStage(source,makeGlyph){
     const fail=message=>({ok:false,message});
     if(!source||typeof source!=='object'||Array.isArray(source))return fail('ステージのデータ形式が正しくありません。');
@@ -181,7 +198,7 @@
     if(!Array.isArray(source.regions)||source.regions.length<1||source.regions.length>60)return fail('地面は1〜60個の長方形で配置してください。');
     const regions=[];
     for(const r of source.regions){
-      if(!r||!finite(r.x,0,WIDTH-25)||!finite(r.y,60,HEIGHT-10)||!finite(r.w,25,WIDTH)||!finite(r.h,10,HEIGHT)||r.x+r.w>WIDTH||r.y+r.h>HEIGHT)return fail('地面が画面の外にはみ出しています。');
+      if(!r||!finite(r.x,0,WIDTH-25)||!finite(r.y,0,HEIGHT-10)||!finite(r.w,25,WIDTH)||!finite(r.h,10,HEIGHT)||r.x+r.w>WIDTH||r.y+r.h>HEIGHT)return fail('地面が画面の外にはみ出しています。');
       regions.push({x:r.x,y:r.y,w:r.w,h:r.h});
     }
     const objects=[];
@@ -189,22 +206,23 @@
     for(const obj of source.objects||[]){
       if(!obj||!['crumble','vine','spike'].includes(obj.type)||!finite(obj.x,0,WIDTH-25)||!finite(obj.y,0,HEIGHT-10)||!finite(obj.w,25,WIDTH)||!finite(obj.h,10,HEIGHT)||obj.x+obj.w>WIDTH||obj.y+obj.h>HEIGHT)return fail('仕掛けの種類と位置を確認してください。');
       const item={type:obj.type,x:obj.x,y:obj.y,w:obj.w,h:obj.h};
+      if(obj.type==='spike'){if(obj.angle!==undefined&&(!Number.isInteger(obj.angle)||obj.angle<0||obj.angle>359))return fail('トゲの角度は0〜359度です。');item.angle=obj.angle||0;}
       if(obj.type==='crumble'){if(typeof obj.delay!=='number'||!Number.isFinite(obj.delay)||obj.delay<0.1||obj.delay>30)return fail('壊れる床の秒数は0.1〜30秒です。');item.delay=obj.delay;}
       objects.push(item);
     }
     const supports=[...regions,...objects.filter(o=>o.type==='crumble')];
     const point=(p,minX,maxX,minY)=>Array.isArray(p)&&p.length===2&&finite(p[0],minX,maxX)&&finite(p[1],minY,HEIGHT);
-    if(!point(source.start,0,WIDTH-34,75))return fail('スタート位置が画面の外です。');
-    if(!point(source.goal,25,WIDTH-25,100))return fail('ゴール位置が画面の外です。');
+    if(!point(source.start,0,WIDTH-34,30))return fail('スタート位置が画面の外です。');
+    if(!point(source.goal,25,WIDTH-25,64))return fail('ゴール位置が画面の外です。');
     const w=rule.width||18,h=rule.height||30,[sx,sy]=source.start,[gx,gy]=source.goal;
     if(!supports.some(r=>r.y===sy&&sx>=r.x&&sx+w<=r.x+r.w))return fail('スタートを地面の上端に置いてください。');
     if(!supports.some(r=>r.y===gy&&gx-20>=r.x&&gx+20<=r.x+r.w))return fail('ゴールを地面の上端に置いてください。');
     if(Math.hypot(gx-sx,gy-sy)<60)return fail('スタートとゴールを少し離してください。');
     const overlaps=(a,b)=>intersects(a,b);
-    if(sy-h<35)return fail('スタートが画面の上端に近すぎます。少し下に置いてください。');
+    if(sy-h<0)return fail('スタートが画面の上端に近すぎます。少し下に置いてください。');
     if(supports.some(r=>overlaps({x:sx,y:sy-h,w,h},r)))return fail('スタートが地面に埋まっています。');
     if(supports.some(r=>overlaps({x:gx-18,y:gy-64,w:36,h:64},r)))return fail('ゴールが地面に埋まっています。');
-    if(objects.some(o=>o.type==='spike'&&overlaps({x:sx,y:sy-h,w,h},o)))return fail('スタートがトゲに重なっています。');
+    if(objects.some(o=>o.type==='spike'&&spikeIntersects({x:sx,y:sy-h,w,h},o)))return fail('スタートがトゲに重なっています。');
     const letter=source.letter;
     if(!Array.isArray(letter)||letter.length!==3||!finite(letter[2],40,2000)||!finite(letter[0],-letter[2]+25,WIDTH-25)||!finite(letter[1],-letter[2]+25,HEIGHT-25))return fail('漢字の大きさは40〜2000pxで、画面内に一部が見える位置にしてください。');
     if(makeGlyph){
@@ -246,7 +264,7 @@
       if(size!==undefined&&size!==letterSize)return {ok:false,message:'入力欄の位置と大きさはステージで指定されています。'};
       const mask=this.makeGlyph(rule.word,letterSize),rules=this.rulesFor(rule);
       const spawn={x:this.level.start[0],y:this.level.start[1]-rules.height,w:rules.width,h:rules.height};
-      if(spawn.y<35||[...this.level.regions,...(this.level.objects||[]).filter(o=>o.type==='crumble'||o.type==='spike')].some(r=>intersects(spawn,r)))return {ok:false,message:'この体の大きさではスタートが地面や上端に重なるため反映できません。'};
+      if(spawn.y<0||[...this.level.regions,...(this.level.objects||[]).filter(o=>o.type==='crumble')].some(r=>intersects(spawn,r))||(this.level.objects||[]).some(o=>o.type==='spike'&&spikeIntersects(spawn,o)))return {ok:false,message:'この体の大きさではスタートが地面や上端に重なるため反映できません。'};
       if(!this.positionFits(x,y,letterSize,mask,spawn))return {ok:false,message:'この字形は地面やスタートに重なるため反映できません。'};
       // Commit the word, its rule and its sole glyph together after every validation passes.
       this.word=rule.word;this.rule=rule;this.rules=rules;
@@ -313,11 +331,11 @@
       if(gy){p.grounded=grounded;this.moveAxis(p.vx*dt,'x');p.grounded=false;this.moveAxis(p.vy*dt,'y');}
       else {p.grounded=grounded;this.moveAxis(p.vy*dt,'y');p.grounded=false;this.moveAxis(p.vx*dt,'x');}
       if(p.x<0||p.x>WIDTH-p.w){if(gx)p.grounded=true;p.x=Math.max(0,Math.min(WIDTH-p.w,p.x));p.vx=0;}
-      if(p.y<35){p.y=35;p.vy=0;if(gy<0)p.grounded=true;}
+      if(p.y<0){p.y=0;p.vy=0;if(gy<0)p.grounded=true;}
       if(this.backgroundSupport(p))p.grounded=true;
       if(p.grounded)p.airJumpsUsed=0;
       if(p.vx*gx+p.vy*gy>=0&&this.solidAt({...p,x:p.x+gx*2,y:p.y+gy*2}))p.grounded=true;
-      if(this.objects.some(o=>o.type==='spike'&&intersects(p,o))){this.die('トゲに触れました。やり直してください。');return;}
+      if(this.objects.some(o=>o.type==='spike'&&spikeIntersects(p,o))){this.die('トゲに触れました。やり直してください。');return;}
       for(const object of this.objects){if(object.type!=='crumble'||object.broken)continue;
         if(p.grounded&&intersects({...p,x:p.x+gx*2,y:p.y+gy*2},object)){object.used+=dt;if(object.used>=object.delay){object.broken=true;p.grounded=false;}}
       }
@@ -326,6 +344,6 @@
       if(intersects(p,{x:goalX-18,y:goalY-64,w:36,h:64})){this.won=true;this.running=false;this.lastEvent='win';}
     }
   }
-  const api={Game,LEVELS,defaultStage,CITY_BUILDINGS,CITY_ROOFS,WIDTH,HEIGHT,GRAVITY,isHan,parseNumber,evaluateRule,evaluateStageRule,validateBindings,EFFECTS,inputBox,sentenceParts,validateStage,buildMask,maskIntersects};
+  const api={Game,LEVELS,defaultStage,CITY_BUILDINGS,CITY_ROOFS,WIDTH,HEIGHT,GRAVITY,isHan,parseNumber,evaluateRule,evaluateStageRule,validateBindings,EFFECTS,inputBox,sentenceParts,validateStage,spikeTriangles,spikeIntersects,buildMask,maskIntersects};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Kotonoha=api;
 })(typeof window!=='undefined'?window:globalThis);

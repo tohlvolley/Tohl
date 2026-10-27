@@ -71,7 +71,7 @@ class StageEditor{
   renderLibrary(){const holder=document.querySelector('#saved-stages');holder.replaceChildren();const result=this.store.read();if(!result.ok||!result.records.length){const note=document.createElement('p');note.className='saved-empty';note.textContent=result.ok?'まだ保存されたステージはありません。':result.message;holder.append(note);return;}
     for(const record of result.records){const row=document.createElement('div');row.className='saved-stage';const load=document.createElement('button');load.type='button';load.textContent=record.stage.title;load.title='読み込んで編集・試遊';load.addEventListener('click',()=>this.openRecord(record));const del=document.createElement('button');del.type='button';del.className='delete-stage';del.textContent='×';del.setAttribute('aria-label',`${record.stage.title}を削除`);del.addEventListener('click',()=>{const removed=this.store.remove(record.id);if(!removed.ok){this.notify(removed.message,true);return;}this.deleted=removed.record;if(this.currentId===record.id)this.currentId=null;document.querySelector('#restore-stage').hidden=false;this.renderLibrary();this.notify('保存したステージを削除しました。直前の削除は下のボタンで戻せます。');});row.append(load,del);holder.append(row);}
   }
-  snap(point){return {x:Math.max(0,Math.min(975,Math.round(point.x/25)*25)),y:Math.max(75,Math.min(475,Math.round(point.y/25)*25))};}
+  snap(point){return {x:Math.max(0,Math.min(975,Math.round(point.x/25)*25)),y:Math.max(0,Math.min(475,Math.round(point.y/25)*25))};}
   groundRect(a,b){const left=Math.min(a.x,b.x),top=Math.min(a.y,b.y);return{x:left,y:top,w:Math.min(WIDTH-left,Math.max(25,Math.abs(a.x-b.x))),h:Math.min(HEIGHT-top,Math.max(25,Math.abs(a.y-b.y))) };}
   pointerDown(point){if(!this.editing)return false;const p=this.snap(point),d=this.document.data;
     if(['ground','crumble','vine','spike'].includes(this.tool)){this.drag={start:p,end:p,tool:this.tool};return true;}
@@ -81,12 +81,12 @@ class StageEditor{
       else {const close=[...next.regions,...(next.objects||[]).filter(o=>o.type==='crumble')].filter(r=>point.x>=r.x&&point.x<=r.x+r.w&&Math.abs(point.y-r.y)<45).sort((a,b)=>Math.abs(point.y-a.y)-Math.abs(point.y-b.y))[0];const y=close?close.y:p.y;if(this.tool==='start')next.start=[Math.min(966,p.x),y];if(this.tool==='goal')next.goal=[Math.max(25,Math.min(975,p.x)),y];}
     });this.changed();return true;
   }
-  pointerMove(point){if(this.editing&&this.drag)this.drag.end={x:Math.max(0,Math.min(1000,Math.round(point.x/25)*25)),y:Math.max(75,Math.min(500,Math.round(point.y/25)*25))};}
+  pointerMove(point){if(this.editing&&this.drag)this.drag.end={x:Math.max(0,Math.min(1000,Math.round(point.x/25)*25)),y:Math.max(0,Math.min(500,Math.round(point.y/25)*25))};}
   pointerUp(){if(!this.drag)return;const rectangle=this.groundRect(this.drag.start,this.drag.end),tool=this.drag.tool;this.drag=null;
     if((tool==='ground'?this.document.data.regions:this.document.data.objects||[]).length>=60){this.notify('地面と仕掛けはそれぞれ60個までです。',true);return;}
-    const delay=Number(document.querySelector('#editor-break-delay').value);
+    const delay=Number(document.querySelector('#editor-break-delay').value),angle=Number(document.querySelector('#editor-spike-angle').value);if(tool==='spike'&&(!Number.isInteger(angle)||angle<0||angle>359)){this.notify('トゲの角度は0〜359度です。',true);return;}
     if(tool==='crumble'&&(!Number.isFinite(delay)||delay<0.1||delay>30)){this.notify('壊れる床の秒数は0.1〜30秒です。',true);return;}
-    this.document.change(d=>{if(tool==='ground')d.regions.push(rectangle);else {d.objects=d.objects||[];d.objects.push({...rectangle,type:tool,...(tool==='crumble'?{delay}:{})});}});this.changed();
+    this.document.change(d=>{if(tool==='ground')d.regions.push(rectangle);else {d.objects=d.objects||[];d.objects.push({...rectangle,type:tool,...(tool==='crumble'?{delay}:tool==='spike'?{angle}:{})});}});this.changed();
   }
   renderBindings(){
     const holder=document.querySelector('#rule-bindings');holder.replaceChildren();
@@ -122,6 +122,8 @@ class StageEditor{
     $('#editor-rule-mode').addEventListener('change',()=>{this.readFields();if(this.document.data.ruleKind==='custom'&&!this.document.data.bindings?.length)this.document.change(d=>d.bindings=[{word:d.word,property:'jumpCount',value:d.baseJumps}]);this.sync();});
     $('#binding-add').addEventListener('click',()=>{this.readFields();if((this.document.data.bindings||[]).length>=40){this.notify('動作は40行までです。',true);return;}this.document.change(d=>{d.bindings=d.bindings||[];d.bindings.push({word:d.word,property:'speed',value:185});});this.sync();});
     $('#gravity-example').addEventListener('click',()=>{this.readFields();this.document.change(d=>{d.ruleKind='custom';d.ruleText='重力の向きが［字］になる。';d.word='上';d.bindings=[['上','up'],['下','down'],['左','left'],['右','right'],['奥','back']].map(([word,value])=>({word,property:'gravityDirection',value}));});this.sync();});
+    $('#editor-spike-direction').addEventListener('change',()=>{if($('#editor-spike-direction').value!=='custom')$('#editor-spike-angle').value=$('#editor-spike-direction').value;});
+    $('#editor-spike-angle').addEventListener('change',()=>{$('#editor-spike-direction').value=['0','90','180','270'].includes($('#editor-spike-angle').value)?$('#editor-spike-angle').value:'custom';});
     $('#editor-size').addEventListener('input',()=>this.resizeLetter(Number($('#editor-size').value)));
     $('#editor-size-number').addEventListener('change',()=>this.resizeLetter(Number($('#editor-size-number').value)));
     $('#editor-undo').addEventListener('click',()=>{this.document.undo();this.sync();});$('#editor-redo').addEventListener('click',()=>{this.document.redo();this.sync();});

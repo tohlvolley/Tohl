@@ -85,3 +85,17 @@ test('ten default stages include a black stage six; count changes preserve hidde
  assert.equal(store.setCount(0).ok,false);assert.equal(store.setCount(101).ok,false);assert.equal(store.setCount(1.5).ok,false);assert.equal(store.count(),12);
  const black=decodeStage(encodeStage(stage({background:'black'})).text);assert.equal(black.level.background,'black');
 });
+
+test('top-edge ground and arbitrary spike angles survive validation and file round trips',()=>{
+ const source=stage({regions:[...stage().regions,{x:350,y:0,w:50,h:25}],objects:[{type:'spike',x:500,y:0,w:25,h:75,angle:137}]});
+ const checked=validateStage(source);assert(checked.ok,checked.message);
+ const file=decodeStage(encodeStage(source).text);assert(file.ok);assert.equal(file.level.objects[0].angle,137);assert.equal(file.level.regions[2].y,0);
+ assert.equal(validateStage(stage({objects:[{type:'spike',x:500,y:0,w:25,h:25,angle:360}]})).ok,false);
+});
+test('spike collision follows the rotated triangles and leaves empty corners safe',()=>{
+ const {spikeIntersects,spikeTriangles}=require('../engine.js');
+ for(const angle of [0,45,90,137,180,270,359]){const o={x:100,y:100,w:25,h:25,angle};assert(spikeIntersects({x:110,y:110,w:4,h:4},o));for(const t of spikeTriangles(o))for(const [x,y] of t)assert(x>=100-1e-8&&x<=125+1e-8&&y>=100-1e-8&&y<=125+1e-8);}
+ const up={x:100,y:100,w:25,h:25,angle:0};assert.equal(spikeIntersects({x:100,y:100,w:3,h:3},up),false);assert(spikeIntersects({x:111,y:100,w:3,h:3},up));
+ const right={...up,angle:90};assert.equal(spikeIntersects({x:122,y:100,w:3,h:3},right),false);assert(spikeIntersects({x:122,y:111,w:3,h:3},right));
+ assert.equal(spikeTriangles({x:0,y:0,w:75,h:25}).length,3);
+});

@@ -1,5 +1,5 @@
 'use strict';
-const {Game,LEVELS,defaultStage,CITY_BUILDINGS,CITY_ROOFS,WIDTH,HEIGHT,evaluateStageRule,inputBox,sentenceParts,isHan,buildMask}=window.Kotonoha;
+const {Game,LEVELS,defaultStage,CITY_BUILDINGS,CITY_ROOFS,spikeTriangles,WIDTH,HEIGHT,evaluateStageRule,inputBox,sentenceParts,isHan,buildMask}=window.Kotonoha;
 const $=selector=>document.querySelector(selector);
 const canvas=$('#world'),ctx=canvas.getContext('2d');
 let game,editor,editorOriginalGame=null,clock=0,previous=0,accumulator=0,composition=false,jumpQueued=false,completed=new Set();
@@ -192,12 +192,21 @@ function drawPlayer(){
   rect(x+unit,y+h-unit*(walk?2:1),unit*2,unit*(walk?2:1),color);
   rect(x+w-unit*3,y+h-unit*(walk?1:2),unit*2,unit*(walk?1:2),color);
 }
+const terrainImages=new WeakMap();
 function drawGround(level=game.level){
-  for(const r of level.regions){
-    rect(r.x,r.y,r.w,r.h,'#193c45');rect(r.x,r.y,r.w,4,'#74c7af');rect(r.x,r.y+4,r.w,5,'#315f5a');
-    for(let x=r.x+4;x<r.x+r.w;x+=20){rect(x,r.y+12,12,3,'#2e5b60');for(let y=r.y+27;y<r.y+r.h;y+=22)rect(x+4,y,4,4,'#244b54');}
-    line(r.x,r.y+1,r.x+r.w,r.y+1,'#a0ffe2');
+  if(!terrainImages.has(level.regions)){
+    const surface=document.createElement('canvas');surface.width=WIDTH;surface.height=HEIGHT;const c=surface.getContext('2d'),filled=new Uint8Array(WIDTH*HEIGHT);
+    for(const r of level.regions)for(let y=r.y;y<r.y+r.h;y++)filled.fill(1,y*WIDTH+r.x,y*WIDTH+r.x+r.w);
+    c.fillStyle='#193c45';c.beginPath();for(const r of level.regions)c.rect(r.x,r.y,r.w,r.h);c.fill();c.save();c.clip();
+    c.fillStyle='#2e5b60';for(let y=10;y<HEIGHT;y+=25)for(let x=5;x<WIDTH;x+=25)c.fillRect(x,y,12,3);
+    c.fillStyle='#244b54';for(let y=20;y<HEIGHT;y+=25)for(let x=12;x<WIDTH;x+=25)c.fillRect(x,y,4,3);c.restore();
+    for(let y=0;y<HEIGHT;y++)for(let x=0;x<WIDTH;x++){const i=y*WIDTH+x;if(!filled[i])continue;
+      if(!y||!filled[i-WIDTH]){c.fillStyle='#a0ffe2';c.fillRect(x,y,1,1);}
+      else if(x===0||x===WIDTH-1||!filled[i-1]||!filled[i+1]||y===HEIGHT-1||!filled[i+WIDTH]){c.fillStyle='#41756d';c.fillRect(x,y,1,1);}
+    }
+    terrainImages.set(level.regions,surface);
   }
+  ctx.drawImage(terrainImages.get(level.regions),0,0);
 }
 function drawGoal(level=game.level){
   const[px,py]=level.goal,blink=Math.floor(clock*3)%2;
@@ -219,7 +228,8 @@ function drawObjects(level=game.level,editing=false){
       for(let x=o.x+o.w/2;x<o.x+o.w;x+=30){rect(x-2,o.y,4,o.h,'#73be83');for(let y=o.y+6;y<o.y+o.h;y+=18){rect(x-11,y,9,5,'#449768');rect(x+2,y+7,9,5,'#89d39a');}}
       if(editing){ctx.strokeStyle='#529d7077';ctx.strokeRect(o.x,o.y,o.w,o.h);}
     }else if(o.type==='spike'){
-      rect(o.x,o.y+o.h-4,o.w,4,'#874453');ctx.fillStyle='#f49aa5';for(let x=o.x;x<o.x+o.w;x+=16){ctx.beginPath();ctx.moveTo(x,o.y+o.h);ctx.lineTo(Math.min(x+8,o.x+o.w),o.y);ctx.lineTo(Math.min(x+16,o.x+o.w),o.y+o.h);ctx.fill();}
+      ctx.fillStyle='#f49aa5';for(const triangle of spikeTriangles(o)){ctx.beginPath();ctx.moveTo(...triangle[0]);ctx.lineTo(...triangle[1]);ctx.lineTo(...triangle[2]);ctx.closePath();ctx.fill();}
+
     }
   }
 }

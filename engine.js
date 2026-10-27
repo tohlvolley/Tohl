@@ -41,7 +41,7 @@
     赤:{color:'#b15d49',description:'体の色が赤くなる。'},
     青:{color:'#5c879e',description:'体の色が青くなる。'},
     白:{color:'#fffdf2',description:'体の色が白くなる。'},
-    黒:{color:'#363f38',description:'体の色が黒くなる。'},
+    黒:{color:'#000000',description:'体の色が黒くなる。'},
     薄:{width:12,opacity:.5,description:'体が薄く、半透明になる。'},
     濃:{color:'#394d37',description:'体の色が濃くなる。'},
     丸:{width:26,height:26,round:true,description:'体が丸くなる。'},
@@ -86,7 +86,7 @@
     gravityStrength:{label:'重力の強さ',min:0,max:2500,default:1050},
     gravityDirection:{label:'重力の向き',choices:{down:'下',up:'上',left:'左',right:'右',back:'奥（背景のビルを足場にする）'},default:'down'},
     width:{label:'体の幅',min:4,max:80,default:18},height:{label:'体の高さ',min:8,max:100,default:30},
-    color:{label:'体の色',color:true,default:'#ece5cf'},opacity:{label:'体の透明度（1＝不透明）',min:0.1,max:1,default:1}
+    color:{label:'体の色',color:true,default:'#000000'},opacity:{label:'体の透明度（1＝不透明）',min:0.1,max:1,default:1}
   };
   function validateBindings(bindings){
     if(!Array.isArray(bindings)||!bindings.length||bindings.length>40)return {ok:false,message:'動作を1〜40行設定してください。'};
@@ -169,20 +169,33 @@
     return p[bottom*s+right]-p[top*s+right]-p[bottom*s+left]+p[top*s+left]>0;
   }
   const spikeCache=new WeakMap();
+  function clipPolygon(points,rect){
+    for(const [axis,bound,greater] of [[0,rect.x,true],[0,rect.x+rect.w,false],[1,rect.y,true],[1,rect.y+rect.h,false]]){
+      const output=[];if(!points.length)break;
+      for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length],inside=p=>greater?p[axis]>=bound:p[axis]<=bound,ai=inside(a),bi=inside(b);
+        if(ai)output.push(a);if(ai!==bi){const t=(bound-a[axis])/(b[axis]-a[axis]);output.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]);}
+      }points=output;
+    }return points;
+  }
   function spikeTriangles(object){
     if(spikeCache.has(object))return spikeCache.get(object);
     const angle=(object.angle||0)*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
     const unit=[[-.5,.5],[0,-.5],[.5,.5]].map(([x,y])=>[x*c-y*s,x*s+y*c]);
     const xs=unit.map(p=>p[0]),ys=unit.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),triangles=[];
-    for(let y=object.y;y<object.y+object.h;y+=25)for(let x=object.x;x<object.x+object.w;x+=25){const w=Math.min(25,object.x+object.w-x),h=Math.min(25,object.y+object.h-y),scale=Math.min(w/(maxX-minX),h/(maxY-minY));triangles.push(unit.map(([px,py])=>[x+w/2+(px-(minX+maxX)/2)*scale,y+h/2+(py-(minY+maxY)/2)*scale]));}
+    const [ox,oy,ow,oh]=object.tileBounds||[object.x,object.y,object.w,object.h];
+    for(let y=oy+Math.floor((object.y-oy)/25)*25;y<Math.min(oy+oh,object.y+object.h);y+=25)for(let x=ox+Math.floor((object.x-ox)/25)*25;x<Math.min(ox+ow,object.x+object.w);x+=25){
+      const w=Math.min(25,ox+ow-x),h=Math.min(25,oy+oh-y),scale=Math.min(w/(maxX-minX),h/(maxY-minY));
+      const points=clipPolygon(unit.map(([px,py])=>[x+w/2+(px-(minX+maxX)/2)*scale,y+h/2+(py-(minY+maxY)/2)*scale]),object);
+      if(points.length>=3){const area=Math.abs(points.reduce((sum,p,i)=>{const q=points[(i+1)%points.length];return sum+p[0]*q[1]-q[0]*p[1];},0));if(area>1e-8)triangles.push(points);}
+    }
     spikeCache.set(object,triangles);return triangles;
   }
   function spikeIntersects(rect,object){
     if(!intersects(rect,object))return false;
     const corners=[[rect.x,rect.y],[rect.x+rect.w,rect.y],[rect.x+rect.w,rect.y+rect.h],[rect.x,rect.y+rect.h]];
     return spikeTriangles(object).some(triangle=>{
-      const axes=[[1,0],[0,1],...triangle.map((p,i)=>{const q=triangle[(i+1)%3];return [p[1]-q[1],q[0]-p[0]];})];
-      return axes.every(([x,y])=>{const a=triangle.map(p=>p[0]*x+p[1]*y),b=corners.map(p=>p[0]*x+p[1]*y);return Math.min(...a)<Math.max(...b)-1e-8&&Math.min(...b)<Math.max(...a)-1e-8;});
+      const axes=[[1,0],[0,1],...triangle.map((p,i)=>{const q=triangle[(i+1)%triangle.length];return [p[1]-q[1],q[0]-p[0]];})];
+      return axes.filter(([x,y])=>Math.abs(x)+Math.abs(y)>1e-8).every(([x,y])=>{const a=triangle.map(p=>p[0]*x+p[1]*y),b=corners.map(p=>p[0]*x+p[1]*y);return Math.min(...a)<Math.max(...b)-1e-8&&Math.min(...b)<Math.max(...a)-1e-8;});
     });
   }
   function validateStage(source,makeGlyph){
@@ -195,18 +208,18 @@
     if(!rule.ok)return fail(rule.message);
     const baseJumps=source.baseJumps===undefined?6:source.baseJumps;
     if(!finite(baseJumps,0,999))return fail('基本ジャンプ回数は0〜999回で指定してください。');
-    if(!Array.isArray(source.regions)||source.regions.length<1||source.regions.length>60)return fail('地面は1〜60個の長方形で配置してください。');
+    if(!Array.isArray(source.regions)||source.regions.length<1||source.regions.length>800)return fail('地面は1〜800個の長方形で配置してください。');
     const regions=[];
     for(const r of source.regions){
-      if(!r||!finite(r.x,0,WIDTH-25)||!finite(r.y,0,HEIGHT-10)||!finite(r.w,25,WIDTH)||!finite(r.h,10,HEIGHT)||r.x+r.w>WIDTH||r.y+r.h>HEIGHT)return fail('地面が画面の外にはみ出しています。');
+      if(!r||!finite(r.x,0,WIDTH-1)||!finite(r.y,0,HEIGHT-1)||!finite(r.w,1,WIDTH)||!finite(r.h,1,HEIGHT)||r.x+r.w>WIDTH||r.y+r.h>HEIGHT)return fail('地面が画面の外にはみ出しています。');
       regions.push({x:r.x,y:r.y,w:r.w,h:r.h});
     }
     const objects=[];
-    if(source.objects!==undefined&&(!Array.isArray(source.objects)||source.objects.length>60))return fail('仕掛けは60個までです。');
+    if(source.objects!==undefined&&(!Array.isArray(source.objects)||source.objects.length>800))return fail('仕掛けは800個までです。');
     for(const obj of source.objects||[]){
-      if(!obj||!['crumble','vine','spike'].includes(obj.type)||!finite(obj.x,0,WIDTH-25)||!finite(obj.y,0,HEIGHT-10)||!finite(obj.w,25,WIDTH)||!finite(obj.h,10,HEIGHT)||obj.x+obj.w>WIDTH||obj.y+obj.h>HEIGHT)return fail('仕掛けの種類と位置を確認してください。');
+      if(!obj||!['crumble','vine','spike'].includes(obj.type)||!finite(obj.x,0,WIDTH-1)||!finite(obj.y,0,HEIGHT-1)||!finite(obj.w,1,WIDTH)||!finite(obj.h,1,HEIGHT)||obj.x+obj.w>WIDTH||obj.y+obj.h>HEIGHT)return fail('仕掛けの種類と位置を確認してください。');
       const item={type:obj.type,x:obj.x,y:obj.y,w:obj.w,h:obj.h};
-      if(obj.type==='spike'){if(obj.angle!==undefined&&(!Number.isInteger(obj.angle)||obj.angle<0||obj.angle>359))return fail('トゲの角度は0〜359度です。');item.angle=obj.angle||0;}
+      if(obj.type==='spike'){if(obj.angle!==undefined&&(!Number.isInteger(obj.angle)||obj.angle<0||obj.angle>359))return fail('トゲの角度は0〜359度です。');item.angle=obj.angle||0;if(obj.tileBounds!==undefined){const t=obj.tileBounds;if(!Array.isArray(t)||t.length!==4||!finite(t[0],0,WIDTH-1)||!finite(t[1],0,HEIGHT-1)||!finite(t[2],1,WIDTH)||!finite(t[3],1,HEIGHT)||t[0]+t[2]>WIDTH||t[1]+t[3]>HEIGHT||obj.x<t[0]||obj.y<t[1]||obj.x+obj.w>t[0]+t[2]||obj.y+obj.h>t[1]+t[3])return fail('トゲのタイル範囲が不正です。');item.tileBounds=[...t];}}
       if(obj.type==='crumble'){if(typeof obj.delay!=='number'||!Number.isFinite(obj.delay)||obj.delay<0.1||obj.delay>30)return fail('壊れる床の秒数は0.1〜30秒です。');item.delay=obj.delay;}
       objects.push(item);
     }
@@ -311,7 +324,7 @@
     }
     backgroundSupport(p){return this.rules.gravityDirection==='back'&&p.vy>=0&&CITY_ROOFS.some(r=>p.x<r.x+r.w&&p.x+p.w>r.x&&Math.abs(p.y+p.h-r.y)<2);}
     gravityVector(){return {down:[0,1],up:[0,-1],left:[-1,0],right:[1,0],back:[0,1]}[this.rules.gravityDirection];}
-    die(message){this.deaths++;this.respawn();this.running=false;this.lastEvent=message;}
+    die(message){this.deaths++;this.respawn();this.running=true;this.elapsed=0;this.lastFailure=message;this.lastEvent='restart';}
     step(dt,input={}){
       if(!this.running||this.won)return;
       this.elapsed+=dt;const p=this.player,[gx,gy]=this.gravityVector();
@@ -320,8 +333,8 @@
       if(!vine)p.climbing=false;
       if(vine&&(input.up||input.down))p.climbing=true;
       const direction=(input.right?1:0)-(input.left?1:0),tangent=gy?'vx':'vy';
-      if(direction){p[tangent]=Math.max(-this.rules.speed,Math.min(this.rules.speed,p[tangent]+direction*1400*dt));p.facing=direction;}
-      else p[tangent]=Math.sign(p[tangent])*Math.max(0,Math.abs(p[tangent])-1600*dt);
+      if(direction){p[tangent]=Math.max(-this.rules.speed,Math.min(this.rules.speed,p[tangent]+direction*2000*dt));p.facing=direction;}
+      else p[tangent]=Math.sign(p[tangent])*Math.max(0,Math.abs(p[tangent])-2200*dt);
       const jumping=!!input.jump||!!input.up&&!vine;
       if(jumping&&!this.jumpHeld&&p.jumpsUsed<this.rules.jumpCount&&(p.grounded||p.climbing||this.solidAt({...p,x:p.x+gx,y:p.y+gy})||this.backgroundSupport(p)||p.airJumpsUsed<1)){if(!p.grounded&&!p.climbing&&!this.solidAt({...p,x:p.x+gx,y:p.y+gy})&&!this.backgroundSupport(p))p.airJumpsUsed++;if(gx)p.vx=-gx*this.rules.jumpPower;else p.vy=-gy*this.rules.jumpPower;p.grounded=false;p.climbing=false;p.jumpsUsed++;}
       this.jumpHeld=jumping;

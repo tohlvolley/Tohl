@@ -49,9 +49,9 @@ test('vines support climbing, holding and jumping off without replenishing jumps
  const y=g.player.y;tick(g,{},60);assert.equal(g.player.y,y);
  tick(g,{jump:true});assert.equal(g.player.climbing,false);assert.equal(g.player.jumpsUsed,1);assert(g.player.vy<0);
 });
-test('touching spikes resets position and terrain and stops the attempt',()=>{
- const g=load(stage({objects:[{type:'spike',x:100,y:395,w:50,h:25}]}));g.running=true;tick(g,{right:true},120);
- assert.equal(g.running,false);assert.equal(g.deaths,1);assert.equal(g.player.x,g.level.start[0]);assert.match(g.lastEvent,/トゲ/);
+test('touching spikes restarts automatically with the same word and rule',()=>{
+ const g=load(stage({objects:[{type:'spike',x:100,y:395,w:50,h:25}]}));g.running=true;for(let i=0;i<120&&!g.deaths;i++)tick(g,{right:true});
+ assert.equal(g.running,true);assert.equal(g.deaths,1);assert.equal(g.player.x,g.level.start[0]);assert.equal(g.lastEvent,'restart');assert.match(g.lastFailure,/トゲ/);assert.equal(g.word,'任');assert.equal(g.placed.length,1);
 });
 test('creator rules and objects round-trip through files and browser stage assignments',()=>{
  const source=custom({objects:[{type:'crumble',x:350,y:400,w:50,h:25,delay:2},{type:'vine',x:550,y:100,w:50,h:200},{type:'spike',x:800,y:395,w:50,h:25}]});
@@ -98,4 +98,24 @@ test('spike collision follows the rotated triangles and leaves empty corners saf
  const up={x:100,y:100,w:25,h:25,angle:0};assert.equal(spikeIntersects({x:100,y:100,w:3,h:3},up),false);assert(spikeIntersects({x:111,y:100,w:3,h:3},up));
  const right={...up,angle:90};assert.equal(spikeIntersects({x:122,y:100,w:3,h:3},right),false);assert(spikeIntersects({x:122,y:111,w:3,h:3},right));
  assert.equal(spikeTriangles({x:0,y:0,w:75,h:25}).length,3);
+});
+
+test('tile erasing cuts one cell out of all overlapping ground without changing the rest',()=>{
+ const {eraseCell,StageDocument}=require('../editor.js');
+ const source=stage({regions:[{x:0,y:400,w:300,h:100},{x:700,y:420,w:300,h:80},{x:50,y:400,w:100,h:100}]});
+ const doc=new StageDocument(source),result=eraseCell(doc.data,{x:112,y:437});assert(result.ok);
+ doc.change(d=>{d.regions=result.regions;d.objects=result.objects;});
+ const solid=(rects,x,y)=>rects.some(r=>x>=r.x&&x<r.x+r.w&&y>=r.y&&y<r.y+r.h);
+ for(let y=400;y<500;y++)for(let x=0;x<300;x++)assert.equal(solid(doc.data.regions,x,y),!(x>=100&&x<125&&y>=425&&y<450));
+ assert(doc.undo());assert.deepEqual(doc.data,source);assert(doc.redo());assert(!solid(doc.data.regions,110,435));
+});
+test('erasing a cell preserves rotated spike pixels and collision outside the erased cell, including unaligned old maps',()=>{
+ const {eraseCell}=require('../editor.js');const {spikeIntersects}=require('../engine.js');
+ const spike={type:'spike',x:170,y:395,w:100,h:40,angle:137},source=stage({objects:[spike]});
+ const result=eraseCell(source,{x:212,y:412});assert(result.ok);assert(result.objects.length>1);
+ for(let y=395;y<435;y++)for(let x=170;x<270;x++){
+  const r={x:x+.2,y:y+.2,w:.6,h:.6},cut=x>=200&&x<225&&y>=400&&y<425;
+  assert.equal(result.objects.some(o=>spikeIntersects(r,o)),!cut&&spikeIntersects(r,spike),`${x},${y}`);
+ }
+ const saved=decodeStage(encodeStage({...source,objects:result.objects}).text);assert(saved.ok);assert(saved.level.objects.every(o=>Array.isArray(o.tileBounds)));
 });

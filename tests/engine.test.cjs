@@ -83,7 +83,7 @@ test('body rules affect actual movement, gravity, size and color as well as the 
 });
 test('pause, death and retry preserve the one-word rule and glyph',()=>{
  const g=game();const before={...g.player};tick(g,{right:true},100);assert.deepEqual(g.player,before);assert.equal(g.elapsed,0);
- const char=g.word;g.player.x=650;g.player.y=550;g.running=true;tick(g,{},30);assert.equal(g.running,false);assert.equal(g.deaths,1);assert.equal(g.word,char);assert.equal(g.placed.length,1);assert.equal(g.placed[0].char,char);
+ const char=g.word;g.player.x=650;g.player.y=550;g.running=true;tick(g,{},30);assert.equal(g.running,true);assert.equal(g.deaths,1);assert.equal(g.word,char);assert.equal(g.placed.length,1);assert.equal(g.placed[0].char,char);
 });
 test('goal contact emits a win and stops play',()=>{
  const g=game();g.player.x=920;g.player.y=380;g.running=true;tick(g);assert(g.won);assert.equal(g.lastEvent,'win');assert.equal(g.running,false);

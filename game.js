@@ -134,12 +134,12 @@ function setupControls(){
     tell(game.running?`← → で移動。Spaceを押し直すと、このステージで残り${game.jumpsLeft}回ジャンプできます。着地しても回復しません。`:'時間を止めました。ステージ内の空欄で漢字を変えられます。');
     if(game.running)canvas.focus({preventScroll:true});
   });
-  $('#retry').addEventListener('click',()=>{game.respawn();game.running=false;clearInput();updateUI();tell('スタートへ戻り、ステージの残り回数をリセットしました。');});
+  $('#retry').addEventListener('click',()=>{game.prepareInput();clearInput();syncPlayField();updateUI();tell('漢字を入力して、もう一度開始できます。');});
   $('#next-level').addEventListener('click',()=>loadLevel((game.index+1)%editor.store.count()));$('#replay').addEventListener('click',restartLevel);
   canvas.addEventListener('pointerdown',e=>{if(e.button!==0||!editor.editing)return;canvas.setPointerCapture(e.pointerId);editor.pointerDown(pointerPosition(e));});
   canvas.addEventListener('pointermove',e=>{if(editor.editing)editor.pointerMove(pointerPosition(e));});
   canvas.addEventListener('pointerup',e=>{if(editor.editing)editor.pointerUp();if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);});
-  canvas.addEventListener('pointercancel',()=>{if(editor)editor.drag=null;});
+  canvas.addEventListener('pointercancel',()=>{if(editor){editor.drag=null;editor.erasing=false;}});
   canvas.addEventListener('contextmenu',e=>e.preventDefault());
   const keyControls={ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right',ArrowUp:'up',w:'up',W:'up',ArrowDown:'down',s:'down',S:'down',' ':'jump'};
   document.addEventListener('keydown',e=>{
@@ -182,15 +182,21 @@ function drawCityBuildings(solid){
   if(solid)for(const roof of CITY_ROOFS)rect(roof.x,roof.y,roof.w,3,'#a3c7ca');
 }
 function drawPlayer(){
-  const p=game.player,x=Math.round(p.x),y=Math.round(p.y),w=p.w,h=p.h;
-  const walk=game.running&&Math.abs(p.vx)>10&&p.grounded?Math.floor(clock*10)%2:0;
-  const unit=Math.max(2,Math.round(w/6)),head=Math.round(h*.32),bodyY=y+head;
-  const color='#000000';
-  rect(x,y,w,head,color);
-  if(game.rules.round){rect(x+unit,bodyY,w-unit*2,h-head-unit*2,color);rect(x,bodyY+unit,w,h-head-unit*4,color);}
-  else rect(x,bodyY,w,h-head-unit*2,color);
-  rect(x+unit,y+h-unit*(walk?2:1),unit*2,unit*(walk?2:1),color);
-  rect(x+w-unit*3,y+h-unit*(walk?1:2),unit*2,unit*(walk?1:2),color);
+  const p=game.player,w=p.w,h=p.h,u=Math.max(1,Math.round(w/7)),moving=game.running&&Math.abs(p.vx)>8,air=!p.grounded&&!p.climbing;
+  const stride=moving?Math.sin(clock*18):0,lean=moving?p.facing*u:0,x=Math.round(p.x),y=Math.round(p.y)+(moving&&!air?u:0),head=Math.round(h*.3),color=game.rules.color;
+  ctx.save();ctx.globalAlpha=game.rules.opacity;
+  // Hood, face slit, tied headband and trailing cloth; rule colour dyes the whole outfit.
+  rect(x+u+lean,y,w-u*2,head,color);rect(x+lean,y+u,w,head-u,color);
+  rect(x+u+lean,y+Math.max(2,Math.floor(head*.45)),w-u*2,Math.max(2,u),'#17212b');
+  rect(x+lean+(p.facing>0?w-u*3:u*2),y+Math.max(2,Math.floor(head*.45)),u,Math.max(1,u),'#e9f2df');
+  const tailX=p.facing>0?x-u*3:x+w;rect(tailX,y+head-u,u*3,u,color);rect(tailX+(p.facing>0?-u:u*2),y+head+Math.round(Math.sin(clock*13)*u),u*2,u,color);
+  const bodyY=y+head,bodyH=Math.max(4,Math.round(h*.4));rect(x+u,bodyY,w-u*2,bodyH,color);
+  if(p.climbing){rect(x-u,bodyY-u,u*2,bodyH,color);rect(x+w-u,bodyY-u*2,u*2,bodyH,color);}
+  else {const armY=bodyY+(air?0:Math.round(bodyH*.4));rect(x+(p.facing>0?-u:u+w-u),armY,u*2,Math.max(u*2,bodyH/2),color);}
+  const legY=bodyY+bodyH,legH=Math.max(u,h-head-bodyH-(moving?u:0));
+  if(air){rect(x,legY,w/2,Math.max(u*2,legH-u),color);rect(x+w/2,legY-u,w/2,Math.max(u*2,legH-u),color);}
+  else {rect(x+u+Math.round(stride*u),legY,u*2,legH-Math.max(0,Math.round(stride*u)),color);rect(x+w-u*3-Math.round(stride*u),legY,u*2,legH-Math.max(0,Math.round(-stride*u)),color);}
+  ctx.restore();
 }
 const terrainImages=new WeakMap();
 function drawGround(level=game.level){
@@ -228,7 +234,7 @@ function drawObjects(level=game.level,editing=false){
       for(let x=o.x+o.w/2;x<o.x+o.w;x+=30){rect(x-2,o.y,4,o.h,'#73be83');for(let y=o.y+6;y<o.y+o.h;y+=18){rect(x-11,y,9,5,'#449768');rect(x+2,y+7,9,5,'#89d39a');}}
       if(editing){ctx.strokeStyle='#529d7077';ctx.strokeRect(o.x,o.y,o.w,o.h);}
     }else if(o.type==='spike'){
-      ctx.fillStyle='#f49aa5';for(const triangle of spikeTriangles(o)){ctx.beginPath();ctx.moveTo(...triangle[0]);ctx.lineTo(...triangle[1]);ctx.lineTo(...triangle[2]);ctx.closePath();ctx.fill();}
+      ctx.fillStyle='#f49aa5';for(const triangle of spikeTriangles(o)){ctx.beginPath();ctx.moveTo(...triangle[0]);for(const point of triangle.slice(1))ctx.lineTo(...point);ctx.closePath();ctx.fill();}
 
     }
   }
@@ -263,8 +269,8 @@ function onWin(){
 }
 function frame(timestamp){
   const delta=Math.min((timestamp-previous)/1000||0,.05);previous=timestamp;clock+=delta;accumulator+=delta;
-  while(accumulator>=1/120){if(!(editor&&editor.editing))game.step(1/120,{...input,jump:input.jump||jumpQueued});jumpQueued=false;accumulator-=1/120;}
-  if(game.lastEvent){const event=game.lastEvent;game.lastEvent='';if(event==='win')onWin();else{clearInput();updateUI();tell(event,true);}}
+  while(accumulator>=1/120){if(!(editor&&editor.editing))game.step(1/120,{...input,jump:input.jump||jumpQueued});jumpQueued=false;if(game.lastEvent==='restart'){clearInput();accumulator=0;break;}accumulator-=1/120;}
+  if(game.lastEvent){const event=game.lastEvent;game.lastEvent='';if(event==='win')onWin();else{clearInput();updateUI();tell(event==='restart'?'':event,event!=='restart');}}
   updateJumpCounter();draw();requestAnimationFrame(frame);
 }
 async function bootstrap(){

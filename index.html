@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0b1220">
 <meta name="description" content="書いた漢字が世界のルールになる。足場と仕掛けを生み出して旅人を導く、漢字アクションパズル。">
-<title>言ノ葉の道 — 漢字でつくるパズル</title>
+<title>字形活路 — 漢字でつくるパズル</title>
 <link rel="preload" href="assets/DotGothic16.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/NotoSansCJKjp-Thin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=studio-11">
+<link rel="stylesheet" href="style.css?v=studio-12">
 <script>
 // Show a useful message even when an asset fails before the game starts.
 (function () {
@@ -31,15 +31,15 @@
   });
 }());
 </script>
-<script src="engine.js?v=studio-11" defer></script>
-<script src="editor.js?v=studio-11" defer></script>
-<script src="game.js?v=studio-11" defer></script>
+<script src="engine.js?v=studio-12" defer></script>
+<script src="editor.js?v=studio-12" defer></script>
+<script src="game.js?v=studio-12" defer></script>
 </head>
 <body class="menu-mode" data-screen="home">
 <noscript><p class="notice error">ゲームを遊ぶには、ブラウザのJavaScriptを有効にしてください。</p></noscript>
 <main class="shell">
-<header><a class="brand" href="./"><span class="brand-mark">言</span><span>言ノ葉の道<small>KOTONOHA // RULE RUNNER</small></span></a><span class="header-note">PIXEL WORLD / ONE GLYPH / ONE RULE</span><button id="editor-open" class="secondary" disabled>＋ ステージを作る</button><button id="help-open" class="quiet">遊び方 <span>?</span></button></header>
-<section id="home-screen" class="navigation-screen" aria-labelledby="home-title"><h1 id="home-title" tabindex="-1">言ノ葉の道</h1><div class="home-actions"><button id="home-stages" class="primary" disabled>ステージ一覧</button><button id="home-editor" class="secondary" disabled>ステージ作成</button></div></section>
+<header><a class="brand" href="./"><span class="brand-mark">字</span><span>字形活路<small>KOTONOHA // RULE RUNNER</small></span></a><span class="header-note">PIXEL WORLD / ONE GLYPH / ONE RULE</span><button id="editor-open" class="secondary" disabled>＋ ステージを作る</button><button id="help-open" class="quiet">遊び方 <span>?</span></button></header>
+<section id="home-screen" class="navigation-screen" aria-labelledby="home-title"><h1 id="home-title" tabindex="-1">字形活路</h1><div class="home-actions"><button id="home-stages" class="primary" disabled>ステージ一覧</button><button id="home-editor" class="secondary" disabled>ステージ作成</button></div></section>
 <section id="list-screen" class="navigation-screen" aria-labelledby="list-title"><div class="list-heading"><h1 id="list-title" tabindex="-1">ステージ一覧</h1><button id="list-home" class="secondary">トップに戻る</button></div><div class="stage-count-settings"><label for="stage-count">ステージ数</label><input id="stage-count" type="number" min="1" max="100" value="10"><button id="stage-count-save" class="secondary">変更</button><p id="stage-count-message" role="status">1〜100ステージ。減らしても各番号への設定は残ります。</p></div><div id="stage-cards" class="stage-cards"></div></section>
 <div class="workspace">
 <section class="stage-panel" aria-label="ゲーム画面">
@@ -64,7 +64,7 @@
 <div class="editor-row"><button id="editor-undo" class="secondary">↶ 元に戻す</button><button id="editor-redo" class="secondary">↷ やり直す</button></div>
 <label class="editor-label" for="editor-rule-mode">ルールの設定<select id="editor-rule-mode"><option value="auto">文章から判定（従来のルール）</option><option value="none">ルールなし・漢字の枠だけ</option><option value="custom">動作を自分で設定</option></select></label>
 <div id="rule-text-wrap"><label class="editor-label" for="editor-rule-text">ルール文<textarea id="editor-rule-text" rows="3" maxlength="100">このステージで［字］回まで飛べる。</textarea></label><p class="editor-help">入力する一文字の位置を［字］で指定します。対応例：このステージで［字］回まで飛べる。／体が［字］くなる。</p>
-</div><section id="rule-builder" hidden><h3>入力した漢字と動作</h3><p class="editor-help">主人公は黒一色固定です。同じ漢字に複数の項目を設定できます。* はすべての漢字に対応します。漢数字を数値として使うこともできます。未設定の漢字は反映されません。</p><div id="rule-bindings"></div><button id="binding-add" class="secondary" type="button">＋ 動作を追加</button><button id="gravity-example" class="quiet" type="button">重力の向きの例を読み込む</button></section>
+</div><section id="rule-builder" hidden><h3>入力した漢字と動作</h3><p class="editor-help">主人公の基本色は黒で、ルールによって色・透明度を変更できます。同じ漢字に複数の項目を設定できます。* はすべての漢字に対応します。漢数字を数値として使うこともできます。未設定の漢字は反映されません。</p><div id="rule-bindings"></div><button id="binding-add" class="secondary" type="button">＋ 動作を追加</button><button id="gravity-example" class="quiet" type="button">重力の向きの例を読み込む</button></section>
 <label class="editor-label" for="editor-word">編集用の漢字<input id="editor-word" value="三" autocomplete="off" spellcheck="false"></label>
 <label class="editor-label" id="base-jumps-wrap" for="editor-jumps" hidden>このステージの総ジャンプ回数<input id="editor-jumps" type="number" min="0" max="999" value="6"></label>
 <label class="size-label" for="editor-size">漢字の大きさ <output id="editor-size-value">180</output><input id="editor-size" type="range" min="40" max="2000" step="1" value="180"></label><label class="editor-label" for="editor-size-number">漢字の大きさ（px）<input id="editor-size-number" type="number" min="40" max="2000" step="1" value="180"></label><p class="editor-help">最大2000px。画面外にはみ出す漢字は見える範囲だけが足場になります。大きい漢字の入力欄と文章は画面上部に表示します。</p><label class="editor-label" for="editor-break-delay">壊れる床：乗れる合計秒数<input id="editor-break-delay" type="number" min="0.1" max="30" step="0.1" value="2"></label><p class="editor-help">設定した秒数は、これから配置する壊れる床に適用します。蔦は ↑↓ / W S で登り降り、Spaceでジャンプ。トゲに触れるとやり直しになります。</p>
@@ -76,8 +76,8 @@
 </div>
 <section id="stage-library" class="stage-library"><div><p class="eyebrow">MY STAGES / LOCAL SAVE</p><h2>保存したステージ</h2><p>このブラウザに保存します。別の端末へはJSONで持ち出せます。</p></div><div id="saved-stages"></div><button id="restore-stage" class="quiet" hidden>直前に削除したステージを戻す</button></section>
 <section class="bottom-notes"><div><span>01</span><p><strong>INPUT</strong>文の空欄に、一文字を入力。</p></div><div><span>02</span><p><strong>SYNC</strong>その一文字だけが、世界に現れる。</p></div><div><span>03</span><p><strong>PLAY</strong>ルールと字形を使って、出口へ。</p></div></section>
-<footer><span>Tohl / 言ノ葉の道</span><span>SYSTEM ONLINE / FIND YOUR WAY_</span></footer>
+<footer><span>Tohl / 字形活路</span><span>SYSTEM ONLINE / FIND YOUR WAY_</span></footer>
 </main>
 <dialog id="stage-menu" aria-labelledby="stage-menu-title"><h2 id="stage-menu-title">メニュー</h2><div class="pause-actions"><button id="menu-restart" class="secondary">最初から</button><button id="menu-stages" class="secondary">ステージ選択に戻る</button><button id="menu-editor" class="secondary" hidden>編集に戻る</button><button id="menu-resume" class="primary">閉じる</button></div></dialog>
-<dialog id="help"><button id="help-close" class="dialog-close" aria-label="閉じる">×</button><p class="eyebrow">HOW TO PLAY / MANUAL</p><h2>ステージの文が、世界のルール。</h2><p>ステージ内の空欄をクリックし、漢字一文字を入力します。Enterまたは「漢字を確定」で反映。入力した文字だけが足場になり、文章のほかの文字は通り抜けられます。空欄の位置は固定です。</p><p><strong>「このステージで三回まで飛べる。」なら、スタートからクリアまで合計3回。</strong>着地しても残り回数は戻りません。空中での追加ジャンプは1回までで、ステージ全体の残り回数も使います。</p><p>漢字を変えると、旅人をスタートへ戻して残り回数をリセットします。不成立・解釈できない文は反映しません。同じ漢字の再確定や一時停止では回数は回復しません。</p><p><strong>← → / A D</strong> で移動、<strong>Space / ↑ / W</strong> でジャンプ。「スタートに戻る」で新しい挑戦を始められます。</p><p>「ステージを作る」から、地面・スタート・ゴール・入力欄を配置できます。地面はドラッグで描画し、他の道具はクリックで配置。試遊してから保存でき、JSONの書き出し・読み込みにも対応しています。</p><button id="help-start" class="primary">ENTER THE WORLD →</button></dialog>
+<dialog id="help"><button id="help-close" class="dialog-close" aria-label="閉じる">×</button><p class="eyebrow">HOW TO PLAY / MANUAL</p><h2>ステージの文が、世界のルール。</h2><p>ステージ内の空欄をクリックし、漢字一文字を入力します。Enterまたは「漢字を確定」で反映。入力した文字だけが足場になり、文章のほかの文字は通り抜けられます。空欄の位置は固定です。</p><p><strong>「このステージで三回まで飛べる。」なら、スタートからクリアまで合計3回。</strong>着地しても残り回数は戻りません。空中での追加ジャンプは1回までで、ステージ全体の残り回数も使います。</p><p>漢字を変えると、旅人をスタートへ戻して残り回数をリセットします。不成立・解釈できない文は反映しません。同じ漢字の再確定や一時停止では回数は回復しません。</p><p><strong>← → / A D</strong> で移動、<strong>Space / ↑ / W</strong> でジャンプ。失敗時は同じ漢字で自動リスタートします。「やり直し」で漢字を入力し直せます。</p><p>「ステージを作る」から、地面・スタート・ゴール・入力欄を配置できます。地面はドラッグで描画し、他の道具はクリックで配置。試遊してから保存でき、JSONの書き出し・読み込みにも対応しています。</p><button id="help-start" class="primary">ENTER THE WORLD →</button></dialog>
 </body></html>

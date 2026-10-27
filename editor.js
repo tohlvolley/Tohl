@@ -9,6 +9,19 @@ class StageDocument{
   undo(){if(!this.past.length)return false;this.future.push(clone(this.data));this.data=this.past.pop();return true;}
   redo(){if(!this.future.length)return false;this.past.push(clone(this.data));this.data=this.future.pop();return true;}
 }
+function subtractCell(rect,cell){
+  const x=Math.max(rect.x,cell.x),y=Math.max(rect.y,cell.y),right=Math.min(rect.x+rect.w,cell.x+cell.w),bottom=Math.min(rect.y+rect.h,cell.y+cell.h);
+  if(x>=right||y>=bottom)return [clone(rect)];
+  const parts=[];if(y>rect.y)parts.push({x:rect.x,y:rect.y,w:rect.w,h:y-rect.y});if(bottom<rect.y+rect.h)parts.push({x:rect.x,y:bottom,w:rect.w,h:rect.y+rect.h-bottom});if(x>rect.x)parts.push({x:rect.x,y,w:x-rect.x,h:bottom-y});if(right<rect.x+rect.w)parts.push({x:right,y,w:rect.x+rect.w-right,h:bottom-y});
+  return parts.map(part=>({...clone(rect),...part,...(rect.type==='spike'?{tileBounds:rect.tileBounds||[rect.x,rect.y,rect.w,rect.h]}:{})}));
+}
+function eraseCell(data,point){
+  const cell={x:Math.max(0,Math.min(975,Math.floor(point.x/25)*25)),y:Math.max(0,Math.min(475,Math.floor(point.y/25)*25)),w:25,h:25};
+  const objects=data.objects||[],hit=objects.some(o=>point.x>=o.x&&point.x<o.x+o.w&&point.y>=o.y&&point.y<o.y+o.h);
+  const regions=hit?data.regions:data.regions.flatMap(r=>subtractCell(r,cell)),nextObjects=hit?objects.flatMap(o=>subtractCell(o,cell)):objects;
+  if(regions.length>800||nextObjects.length>800)return {ok:false,message:'細分化の上限に達しました。不要な部分を消してから続けてください。'};
+  return {ok:true,regions,objects:nextObjects};
+}
 class StageStore{
   constructor(storage){this.storage=storage;this.key='kotonoha-custom-stages-v1';}
   read(){
@@ -40,7 +53,7 @@ class StageStore{
   restore(record){const current=this.read();if(!current.ok)return current;if(current.records.some(r=>r.id===record.id)||current.records.length>=20)return {ok:false,message:'このステージを戻せません。'};const checked=validateStage(record.stage);if(!checked.ok)return checked;return this.write([...current.records,{id:record.id,stage:checked.level}]);}
 }
 function encodeStage(source){const checked=validateStage(source);return checked.ok?{ok:true,text:JSON.stringify({format:'kotonoha-stage',version:1,stage:checked.level},null,2)}:checked;}
-function decodeStage(text){if(typeof text!=='string'||text.length>100000)return {ok:false,message:'ステージファイルは100KB以内のJSONにしてください。'};try{const data=JSON.parse(text);if(!data||data.format!=='kotonoha-stage'||data.version!==1)return {ok:false,message:'この形式のステージファイルには対応していません。'};return validateStage(data.stage);}catch{return {ok:false,message:'JSONを読み込めませんでした。ファイルの内容を確認してください。'};}}
+function decodeStage(text){if(typeof text!=='string'||text.length>524288)return {ok:false,message:'ステージファイルは512KB以内のJSONにしてください。'};try{const data=JSON.parse(text);if(!data||data.format!=='kotonoha-stage'||data.version!==1)return {ok:false,message:'この形式のステージファイルには対応していません。'};return validateStage(data.stage);}catch{return {ok:false,message:'JSONを読み込めませんでした。ファイルの内容を確認してください。'};}}
 class StageEditor{
   constructor(options){
     this.options=options;this.editing=false;this.testing=false;this.active=false;this.tool='ground';this.document=null;this.currentId=null;this.drag=null;this.deleted=null;
@@ -55,11 +68,11 @@ class StageEditor{
   sync(){
     const $=s=>document.querySelector(s);$('#editor-panel').hidden=!this.editing;$('#play-sidebar').hidden=this.editing;$('#editor-return').hidden=!this.testing;$('#rule-word').hidden=this.editing;
     $('.canvas-wrap').classList.toggle('studio-mode',this.editing);$('#editor-open').disabled=this.editing;$('#editor-open').textContent=this.testing?'↶ ステージ編集に戻る':'＋ ステージを作る';
-    if(this.document){const slot=$('#editor-slot'),selected=slot.value,count=this.store.count();if(slot.options.length!==count){slot.replaceChildren();for(let i=0;i<count;i++){const option=document.createElement('option');option.value=i;option.textContent=`STAGE ${i+1}`;slot.append(option);}slot.value=Number(selected)<count?selected:'0';}const d=this.document.data;$('#editor-background').value=d.background||'city';$('#editor-title').value=d.title;$('#editor-rule-mode').value=['none','custom'].includes(d.ruleKind)?d.ruleKind:'auto';$('#rule-text-wrap').hidden=d.ruleKind==='none';$('#rule-builder').hidden=d.ruleKind!=='custom';this.renderBindings();$('#editor-rule-text').value=d.ruleText||(d.ruleKind==='jumps'?'このステージで［字］回まで飛べる。':'体が［字］くなる。');$('#editor-word').value=d.word;$('#editor-jumps').value=d.baseJumps;$('#editor-size').value=d.letter[2];$('#editor-size-number').value=d.letter[2];$('#editor-size-value').textContent=d.letter[2];$('#base-jumps-wrap').hidden=false;$('#editor-summary').textContent=`地面 ${d.regions.length} / 60個 · 仕掛け ${(d.objects||[]).length} / 60個 · 漢字 (${d.letter[0]}, ${d.letter[1]}) · 空欄は一つ`;
+    if(this.document){const slot=$('#editor-slot'),selected=slot.value,count=this.store.count();if(slot.options.length!==count){slot.replaceChildren();for(let i=0;i<count;i++){const option=document.createElement('option');option.value=i;option.textContent=`STAGE ${i+1}`;slot.append(option);}slot.value=Number(selected)<count?selected:'0';}const d=this.document.data;$('#editor-background').value=d.background||'city';$('#editor-title').value=d.title;$('#editor-rule-mode').value=['none','custom'].includes(d.ruleKind)?d.ruleKind:'auto';$('#rule-text-wrap').hidden=d.ruleKind==='none';$('#rule-builder').hidden=d.ruleKind!=='custom';this.renderBindings();$('#editor-rule-text').value=d.ruleText||(d.ruleKind==='jumps'?'このステージで［字］回まで飛べる。':'体が［字］くなる。');$('#editor-word').value=d.word;$('#editor-jumps').value=d.baseJumps;$('#editor-size').value=d.letter[2];$('#editor-size-number').value=d.letter[2];$('#editor-size-value').textContent=d.letter[2];$('#base-jumps-wrap').hidden=false;$('#editor-summary').textContent=`地面 ${d.regions.length} / 800個 · 仕掛け ${(d.objects||[]).length} / 800個 · 漢字 (${d.letter[0]}, ${d.letter[1]}) · 空欄は一つ`;
       $('#editor-undo').disabled=!this.document.past.length;$('#editor-redo').disabled=!this.document.future.length;
     }
     document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===this.tool)));
-    const tips={ground:'ドラッグして長方形の地面を描きます。クリックだけなら25px四方です。',start:'地面の上端をクリックして、スタート（足元の位置）を置きます。',goal:'地面の上端をクリックして、ゴールを置きます。',rule:'クリックした場所に、文章と漢字の入力欄をまとめて置きます。',crumble:'ドラッグして壊れる床を配置します。乗った合計秒数で消え、やり直すと復活します。',vine:'ドラッグして登り降りできる蔦を配置します。蔦は通り抜けられます。',spike:'ドラッグしてトゲを配置します。触れるとスタートに戻ります。',erase:'消したい地面・仕掛けをクリックします。「元に戻す」で復元できます。'};
+    const tips={ground:'ドラッグして長方形の地面を描きます。クリックだけなら25px四方です。',start:'地面の上端をクリックして、スタート（足元の位置）を置きます。',goal:'地面の上端をクリックして、ゴールを置きます。',rule:'クリックした場所に、文章と漢字の入力欄をまとめて置きます。',crumble:'ドラッグして壊れる床を配置します。乗った合計秒数で消え、やり直すと復活します。',vine:'ドラッグして登り降りできる蔦を配置します。蔦は通り抜けられます。',spike:'ドラッグしてトゲを配置します。触れるとスタートに戻ります。',erase:'クリックで1マスだけ消します。ドラッグすると通ったマスだけ消えます。「元に戻す」で復元できます。'};
     $('#editor-tool-help').textContent=tips[this.tool];this.options.onChange();
   }
   readFields(){if(!this.document)return;const $=s=>document.querySelector(s);this.document.change(d=>{d.title=$('#editor-title').value;d.background=$('#editor-background').value;const mode=$('#editor-rule-mode').value;d.ruleKind=mode==='auto'?(['jumps','body'].includes(d.ruleKind)?d.ruleKind:'jumps'):mode;d.ruleText=$('#editor-rule-text').value;d.word=$('#editor-word').value.trim();d.baseJumps=Number($('#editor-jumps').value);});}
@@ -67,23 +80,25 @@ class StageEditor{
   test(){const checked=this.check();if(!checked.ok){this.notify(checked.message,true);this.sync();return;}const result=this.options.loadStage(checked.level);if(!result.ok){this.notify(result.message,true);return;}this.editing=false;this.testing=true;this.sync();this.notify('試遊モードです。漢字を入力して「開始」で試遊し、メニューの「編集に戻る」で下書きに戻れます。');}
   save(copy=false){const checked=this.check();if(!checked.ok){this.notify(checked.message,true);return;}const result=this.store.save(checked.level,copy?null:this.currentId);if(!result.ok){this.notify(result.message,true);return;}this.currentId=result.record.id;this.document.data=clone(result.record.stage);this.sync();this.renderLibrary();this.notify('このブラウザにステージを保存しました。別の端末へはJSONで持ち出せます。');}
   export(){const checked=this.check();if(!checked.ok){this.notify(checked.message,true);return;}const encoded=encodeStage(checked.level);if(!encoded.ok){this.notify(encoded.message,true);return;}const url=URL.createObjectURL(new Blob([encoded.text],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=`${checked.level.title.replace(/[^\p{L}\p{N}_-]/gu,'_')||'stage'}.json`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);this.notify('ステージのJSONを書き出しました。');}
-  async import(file){if(!file)return;if(file.size>100000){this.notify('ステージファイルは100KB以内にしてください。',true);return;}let result;try{result=decodeStage(await file.text());}catch{result={ok:false,message:'ファイルを読めませんでした。'};}if(!result.ok){this.notify(result.message,true);return;}const checked=validateStage(result.level,this.options.makeGlyph);if(!checked.ok){this.notify(checked.message,true);return;}this.begin();this.document=new StageDocument(checked.level);this.currentId=null;this.editing=true;this.testing=false;this.sync();this.notify('JSONを読み込みました。端末に残すには「端末に保存」を押してください。');}
+  async import(file){if(!file)return;if(file.size>524288){this.notify('ステージファイルは512KB以内にしてください。',true);return;}let result;try{result=decodeStage(await file.text());}catch{result={ok:false,message:'ファイルを読めませんでした。'};}if(!result.ok){this.notify(result.message,true);return;}const checked=validateStage(result.level,this.options.makeGlyph);if(!checked.ok){this.notify(checked.message,true);return;}this.begin();this.document=new StageDocument(checked.level);this.currentId=null;this.editing=true;this.testing=false;this.sync();this.notify('JSONを読み込みました。端末に残すには「端末に保存」を押してください。');}
   renderLibrary(){const holder=document.querySelector('#saved-stages');holder.replaceChildren();const result=this.store.read();if(!result.ok||!result.records.length){const note=document.createElement('p');note.className='saved-empty';note.textContent=result.ok?'まだ保存されたステージはありません。':result.message;holder.append(note);return;}
     for(const record of result.records){const row=document.createElement('div');row.className='saved-stage';const load=document.createElement('button');load.type='button';load.textContent=record.stage.title;load.title='読み込んで編集・試遊';load.addEventListener('click',()=>this.openRecord(record));const del=document.createElement('button');del.type='button';del.className='delete-stage';del.textContent='×';del.setAttribute('aria-label',`${record.stage.title}を削除`);del.addEventListener('click',()=>{const removed=this.store.remove(record.id);if(!removed.ok){this.notify(removed.message,true);return;}this.deleted=removed.record;if(this.currentId===record.id)this.currentId=null;document.querySelector('#restore-stage').hidden=false;this.renderLibrary();this.notify('保存したステージを削除しました。直前の削除は下のボタンで戻せます。');});row.append(load,del);holder.append(row);}
   }
   snap(point){return {x:Math.max(0,Math.min(975,Math.round(point.x/25)*25)),y:Math.max(0,Math.min(475,Math.round(point.y/25)*25))};}
   groundRect(a,b){const left=Math.min(a.x,b.x),top=Math.min(a.y,b.y);return{x:left,y:top,w:Math.min(WIDTH-left,Math.max(25,Math.abs(a.x-b.x))),h:Math.min(HEIGHT-top,Math.max(25,Math.abs(a.y-b.y))) };}
   pointerDown(point){if(!this.editing)return false;const p=this.snap(point),d=this.document.data;
+    if(this.tool==='erase'){this.erasing=true;this.erasedCells=new Set();this.erasePrevious=null;this.eraseAt(point);return true;}
     if(['ground','crumble','vine','spike'].includes(this.tool)){this.drag={start:p,end:p,tool:this.tool};return true;}
     this.document.change(next=>{
-      if(this.tool==='erase'){const objects=next.objects||[];for(let i=objects.length-1;i>=0;i--){const o=objects[i];if(point.x>=o.x&&point.x<=o.x+o.w&&point.y>=o.y&&point.y<=o.y+o.h){objects.splice(i,1);return;}}for(let i=next.regions.length-1;i>=0;i--){const r=next.regions[i];if(point.x>=r.x&&point.x<=r.x+r.w&&point.y>=r.y&&point.y<=r.y+r.h){next.regions.splice(i,1);break;}}}
-      else if(this.tool==='rule'){const size=next.letter[2];next.letter[0]=Math.max(25-size,Math.min(975,Math.round((point.x-size/2)/25)*25));next.letter[1]=Math.max(25-size,Math.min(475,Math.round((point.y-size/2)/25)*25));}
+      if(this.tool==='rule'){const size=next.letter[2];next.letter[0]=Math.max(25-size,Math.min(975,Math.round((point.x-size/2)/25)*25));next.letter[1]=Math.max(25-size,Math.min(475,Math.round((point.y-size/2)/25)*25));}
       else {const close=[...next.regions,...(next.objects||[]).filter(o=>o.type==='crumble')].filter(r=>point.x>=r.x&&point.x<=r.x+r.w&&Math.abs(point.y-r.y)<45).sort((a,b)=>Math.abs(point.y-a.y)-Math.abs(point.y-b.y))[0];const y=close?close.y:p.y;if(this.tool==='start')next.start=[Math.min(966,p.x),y];if(this.tool==='goal')next.goal=[Math.max(25,Math.min(975,p.x)),y];}
     });this.changed();return true;
   }
-  pointerMove(point){if(this.editing&&this.drag)this.drag.end={x:Math.max(0,Math.min(1000,Math.round(point.x/25)*25)),y:Math.max(0,Math.min(500,Math.round(point.y/25)*25))};}
-  pointerUp(){if(!this.drag)return;const rectangle=this.groundRect(this.drag.start,this.drag.end),tool=this.drag.tool;this.drag=null;
-    if((tool==='ground'?this.document.data.regions:this.document.data.objects||[]).length>=60){this.notify('地面と仕掛けはそれぞれ60個までです。',true);return;}
+  eraseAt(point){point={x:Math.max(0,Math.min(WIDTH-.001,point.x)),y:Math.max(0,Math.min(HEIGHT-.001,point.y))};const previous=this.erasePrevious||point,steps=Math.max(1,Math.ceil(Math.max(Math.abs(point.x-previous.x),Math.abs(point.y-previous.y))/12));for(let i=1;i<=steps;i++)this.eraseOne({x:previous.x+(point.x-previous.x)*i/steps,y:previous.y+(point.y-previous.y)*i/steps});this.erasePrevious=point;}
+  eraseOne(point){const key=`${Math.floor(point.x/25)},${Math.floor(point.y/25)}`;if(this.erasedCells.has(key))return;this.erasedCells.add(key);const result=eraseCell(this.document.data,point);if(!result.ok){this.notify(result.message,true);return;}this.document.change(d=>{d.regions=result.regions;d.objects=result.objects;});this.changed();}
+  pointerMove(point){if(this.editing&&this.erasing){this.eraseAt(point);return;}if(this.editing&&this.drag)this.drag.end={x:Math.max(0,Math.min(1000,Math.round(point.x/25)*25)),y:Math.max(0,Math.min(500,Math.round(point.y/25)*25))};}
+  pointerUp(){this.erasing=false;this.erasePrevious=null;if(!this.drag)return;const rectangle=this.groundRect(this.drag.start,this.drag.end),tool=this.drag.tool;this.drag=null;
+    if((tool==='ground'?this.document.data.regions:this.document.data.objects||[]).length>=800){this.notify('地面と仕掛けはそれぞれ800個までです。',true);return;}
     const delay=Number(document.querySelector('#editor-break-delay').value),angle=Number(document.querySelector('#editor-spike-angle').value);if(tool==='spike'&&(!Number.isInteger(angle)||angle<0||angle>359)){this.notify('トゲの角度は0〜359度です。',true);return;}
     if(tool==='crumble'&&(!Number.isFinite(delay)||delay<0.1||delay>30)){this.notify('壊れる床の秒数は0.1〜30秒です。',true);return;}
     this.document.change(d=>{if(tool==='ground')d.regions.push(rectangle);else {d.objects=d.objects||[];d.objects.push({...rectangle,type:tool,...(tool==='crumble'?{delay}:tool==='spike'?{angle}:{})});}});this.changed();
@@ -96,7 +111,7 @@ class StageEditor{
       const word=add('漢字（*＝すべて）',document.createElement('input'));word.value=row.word;word.className='binding-word';word.autocomplete='off';
       word.addEventListener('change',()=>{this.document.change(d=>d.bindings[index].word=word.value.trim());this.sync();});
       const property=add('変える項目',document.createElement('select'));property.className='binding-property';
-      for(const [value,def] of Object.entries(api.EFFECTS).filter(([key])=>!['color','opacity'].includes(key)||row.property===key)){const o=document.createElement('option');o.value=value;o.textContent=def.label+(['color','opacity'].includes(value)?'（現在は黒一色固定）':'');property.append(o);}property.value=row.property;
+      for(const [value,def] of Object.entries(api.EFFECTS)){const o=document.createElement('option');o.value=value;o.textContent=def.label;property.append(o);}property.value=row.property;
       property.addEventListener('change',()=>{this.document.change(d=>{d.bindings[index].property=property.value;d.bindings[index].value=api.EFFECTS[property.value].default;});this.sync();});
       const def=api.EFFECTS[row.property];if(!def)continue;
       if(!def.choices&&!def.color){const source=add('数値の決め方',document.createElement('select'));source.className='binding-source';for(const [value,title] of [['fixed','指定した数値'],['number','入力した漢数字の値']]){const o=document.createElement('option');o.value=value;o.textContent=title;source.append(o);}source.value=row.value==='$number'?'number':'fixed';source.addEventListener('change',()=>{this.document.change(d=>d.bindings[index].value=source.value==='number'?'$number':def.default);this.sync();});}
@@ -133,5 +148,5 @@ class StageEditor{
     $('#restore-stage').addEventListener('click',()=>{if(!this.deleted)return;const result=this.store.restore(this.deleted);if(!result.ok){this.notify(result.message,true);return;}this.deleted=null;$('#restore-stage').hidden=true;this.renderLibrary();this.notify('削除したステージを戻しました。');});
   }
 }
-const exported={StageDocument,StageStore,encodeStage,decodeStage,StageEditor};if(typeof module!=='undefined'&&module.exports)module.exports=exported;else root.KotonohaEditor=exported;
+const exported={StageDocument,StageStore,subtractCell,eraseCell,encodeStage,decodeStage,StageEditor};if(typeof module!=='undefined'&&module.exports)module.exports=exported;else root.KotonohaEditor=exported;
 })(typeof window!=='undefined'?window:globalThis);

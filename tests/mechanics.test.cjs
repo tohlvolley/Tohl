@@ -127,3 +127,13 @@ test('erasing a cell preserves rotated spike pixels and collision outside the er
  }
  const saved=decodeStage(encodeStage({...source,objects:result.objects}).text);assert(saved.ok);assert(saved.level.objects.every(o=>Array.isArray(o.tileBounds)));
 });
+
+test('the depth exit requires a new jump from a building face behind the unchanged gate',()=>{
+ const source=custom({word:'奥',bindings:[{word:'奥',property:'gravityDirection',value:'back'}]});
+ const standing=()=>{const g=load(source);g.running=true;tick(g,{},90);g.player.depth.x=937;g.player.depth.y=388;g.player.depth.z=0;g.player.depth.vz=0;g.player.grounded=true;return g;};
+ const g=standing();tick(g,{},30);assert.equal(g.won,false);tick(g,{jump:true});assert.equal(g.player.depth.exiting,true);tick(g,{},20);assert.equal(g.won,true);assert.equal(g.player.jumpsUsed,1);
+ const air=standing();air.player.grounded=false;air.player.depth.z=20;air.player.depth.vz=200;tick(air,{jump:true});tick(air,{},20);assert.equal(air.won,false);assert(!air.player.depth.exiting);
+ const empty=standing();empty.player.jumpsUsed=empty.rules.jumpCount;tick(empty,{jump:true});tick(empty,{},20);assert.equal(empty.won,false);
+ const gap=standing();gap.player.depth.x=925;tick(gap,{jump:true});tick(gap,{},20);assert.equal(gap.won,false);assert(!gap.player.depth.exiting);
+ assert.equal(LEVELS[9].baseJumps,9);
+});

@@ -110,6 +110,7 @@ function setupControls(){
   $('#home-stages').addEventListener('click',()=>{setScreen('list');$('#list-title').focus();});
   $('#list-home').addEventListener('click',()=>{setScreen('home');$('#home-stages').focus();});
   $('#home-editor').addEventListener('click',()=>editor.open());
+  $('#editor-list').addEventListener('click',()=>{editor.suspend();setScreen('list');$('#list-title').focus();});
   $('#stage-menu-open').addEventListener('click',openStageMenu);
   $('#menu-resume').addEventListener('click',()=>closeStageMenu(true));
   $('#menu-restart').addEventListener('click',()=>{closeStageMenu();restartLevel();});
@@ -166,20 +167,21 @@ function rect(x,y,w,h,fill,r=0){
 function line(x1,y1,x2,y2,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();}
 function text(value,x,y,size,color,font='serif'){ctx.font=`${size}px ${font}`;ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(value,x,y);}
 function drawBackground(){
-  const level=editor&&editor.editing?editor.document.data:game.level;if(level.background==='black'){rect(0,0,1000,500,'#000000');return;}
+  const level=editor&&editor.editing?editor.document.data:game.level;if(level.background==='black'){rect(0,0,1000,500,'#000000');drawMoon();return;}
   rect(0,0,1000,500,'#101d31');
   for(let x=0;x<1000;x+=25)line(x,0,x,500,'#20374e45');
   for(let y=0;y<500;y+=25)line(0,y,1000,y,'#20374e45');
   for(let i=0;i<36;i++){const x=(i*137+17)%1000,y=(i*71+51)%270;rect(x,y,i%5===0?3:2,i%5===0?3:2,i%5===0?'#7badc7':'#42647e');}
   // Stepped silhouettes and a square moon keep the scenery on the pixel grid.
-  rect(800,55,48,48,'#324d67');rect(809,55,39,39,'#a5d5d3');rect(800,64,39,39,'#c4e6d8');
+  drawMoon();
   drawCityBuildings();
   line(0,475,1000,475,'#2e6b7950');
 }
+function drawMoon(){rect(800,55,48,48,'#324d67');rect(809,55,39,39,'#a5d5d3');rect(800,64,39,39,'#c4e6d8');}
 function drawCityBuildings(){
   for(const r of CITY_BUILDINGS){
-    rect(r.x,r.y,r.w,r.h,'#1c3549');rect(r.x,r.y,3,r.h,'#24445a');rect(r.x,r.y,r.w,3,'#2a4a60');
-    for(let x=r.x+12;x<r.x+r.w-8;x+=20)for(let y=r.y+16;y<HEIGHT;y+=30)rect(x,y,5,8,'#28475a');
+    rect(r.x,r.y,r.w,r.h,'#17293a');rect(r.x,r.y,3,r.h,'#1a2e40');rect(r.x,r.y,r.w,3,'#1b2f41');
+    for(let x=r.x+12;x<r.x+r.w-8;x+=20)for(let y=r.y+16;y<HEIGHT;y+=30)rect(x,y,5,8,'#1c3042');
   }
 }
 function drawDepthPlayer(){
@@ -225,7 +227,6 @@ function drawGround(level=game.level){
   ctx.drawImage(terrainImages.get(level.regions),0,0);
 }
 function drawGoal(level=game.level){
-  if(game.rules.gravityDirection==='back'&&!(editor&&editor.editing)&&level===game.level){const goal=cityEntryPoint(level,level.goal[0],level.goal[1]-80);ctx.strokeStyle='#83d4d7';ctx.lineWidth=2;ctx.strokeRect(goal.x-10,goal.y-10,20,20);text('EXIT',goal.x,goal.y-20,9,'#83d4d7','PixelJP,monospace');return;}
   const[px,py]=level.goal,blink=Math.floor(clock*3)%2;
   rect(px-25,py-70,50,70,'#19394b');rect(px-25,py-70,5,70,'#66d7e0');rect(px+20,py-70,5,70,'#66d7e0');rect(px-25,py-70,50,5,'#a6f4ed');
   for(let y=py-59;y<py-6;y+=8)rect(px-15,y,30,2,'#4d9aa54d');
@@ -252,9 +253,8 @@ function drawObjects(level=game.level,editing=false){
 }
 function drawRuleSentence(level,word,mask){
   const[x,y,size]=level.letter,{x:bx,y:by,size:bs}=inputBox(level),cy=by+bs/2,[prefix,suffix]=sentenceParts(level);
-  ctx.save();if(level===game.level&&game.rules.gravityDirection==='back'&&!(editor&&editor.editing))ctx.globalAlpha*=.22;
+  ctx.save();
   if(mask)ctx.drawImage(mask.canvas,x,y);else if(isHan(word))ctx.drawImage(makeGlyph(word,size).canvas,x,y);ctx.restore();
-  if(bs!==size&&isHan(word)){rect(bx-6,by-6,bs+12,bs+12,'#101d31ed');ctx.drawImage(makeGlyph(word,bs).canvas,bx,by);}
   ctx.save();ctx.font='18px PixelJP,monospace';ctx.textBaseline='middle';ctx.fillStyle='#91bad0';
   ctx.textAlign='right';ctx.fillText(prefix,bx-12,cy,Math.max(1,bx-20));ctx.textAlign='left';ctx.fillText(suffix,bx+bs+12,cy,Math.max(1,WIDTH-bx-bs-20));ctx.restore();
   if(word&&!isHan(word))text(word,bx+bs/2,cy,Math.min(45,bs/Math.max(1,Array.from(word).length)),'#ffb49d','PixelJP,monospace');
@@ -268,7 +268,7 @@ function drawEditorScene(){
 function draw(){
   if(!game)return;drawBackground();
   if(editor&&editor.editing){drawEditorScene();return;}
-  ctx.save();if(game.rules.gravityDirection==='back')ctx.globalAlpha=.22;drawGround();drawObjects();ctx.restore();
+  drawGround();drawObjects();
   const draft=$('#rule-word').value.trim(),pending=!game.running&&!game.won&&draft!==game.word;
   drawRuleSentence(game.level,pending?draft:game.word,pending?null:game.placed[0]?.mask);
   const[sx,sy]=game.level.start;text('START',sx+8,sy+15,8,'#8eafc0','PixelJP,monospace');drawGoal();drawPlayer();

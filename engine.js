@@ -18,6 +18,7 @@
     for(const r of CITY_BUILDINGS){const px=Math.max(r.x+7,Math.min(r.x+r.w-7,x)),py=Math.max(r.y+7,Math.min(HEIGHT-7,y)),distance=(x-px)**2+(y-py)**2;if(distance<best){best=distance;nearest={x:Math.max(7,Math.min(WIDTH-7,px)),y:py};}}
     return nearest;
   }
+  function atDepthExit(level,x,y){return Math.abs(x-level.goal[0])<=18&&y>=level.goal[1]-58&&y<=level.goal[1]-8;}
   function depthProjection(player){
     const d=player.depth;if(!d)return {x:player.x+player.w/2,y:player.y+player.h/2,scale:1};
     const t=Math.min(1,d.entry),ease=t*t;
@@ -30,7 +31,7 @@
     if(index===6)level.objects=[{type:'vine',x:320,y:150,w:50,h:270},{type:'vine',x:620,y:150,w:50,h:270}];
     if(index===7)level.objects=[{type:'crumble',x:320,y:400,w:100,h:25,delay:2},{type:'crumble',x:570,y:400,w:100,h:25,delay:2}];
     if(index===8)level.objects=[{type:'spike',x:170,y:395,w:50,h:25},{type:'spike',x:780,y:395,w:50,h:25}];
-    if(index===9){level.ruleKind='custom';level.ruleText='重力の向きが［字］になる。';level.word='奥';level.bindings=[{word:'奥',property:'gravityDirection',value:'back'},{word:'下',property:'gravityDirection',value:'down'}];}
+    if(index===9){level.baseJumps=9;level.ruleKind='custom';level.ruleText='重力の向きが［字］になる。';level.word='奥';level.bindings=[{word:'奥',property:'gravityDirection',value:'back'},{word:'下',property:'gravityDirection',value:'down'}];}
     LEVELS.push(level);
   }
   function defaultStage(index){const source=LEVELS[index]||LEVELS[0];const level=JSON.parse(JSON.stringify(source));if(index>=LEVELS.length)level.title=level.chapter=`STAGE ${index+1}`;return level;}
@@ -338,12 +339,11 @@
       if(d.entry<1){d.entry=Math.min(1,d.entry+dt/.65);p.grounded=false;if(d.entry===1){if(citySurfaceAt(this.level,d.x,d.y)){p.grounded=true;p.surface='ビル側面';}else {d.z=-1;d.vz=-30;}}this.jumpHeld=!!input.jump;}
       else {
         const surface=citySurfaceAt(this.level,d.x,d.y);if(p.grounded&&!surface)p.grounded=false;
-        if(input.jump&&!this.jumpHeld&&p.jumpsUsed<this.rules.jumpCount&&(p.grounded||p.airJumpsUsed<1)){if(!p.grounded)p.airJumpsUsed++;p.grounded=false;d.vz=this.rules.jumpPower;p.jumpsUsed++;}
+        if(input.jump&&!this.jumpHeld&&p.jumpsUsed<this.rules.jumpCount&&(p.grounded||p.airJumpsUsed<1)){const exiting=p.grounded&&atDepthExit(this.level,d.x,d.y);if(!p.grounded)p.airJumpsUsed++;p.grounded=false;d.vz=this.rules.jumpPower;p.jumpsUsed++;if(exiting)d.exiting=true;}
         this.jumpHeld=!!input.jump;
-        if(!p.grounded){const previous=d.z;d.vz-=this.rules.gravityStrength*dt;d.z+=d.vz*dt;if(previous>=0&&d.z<=0&&surface){d.z=0;d.vz=0;p.grounded=true;p.surface='ビル側面';p.airJumpsUsed=0;}}
+        if(!p.grounded){const previous=d.z;d.vz-=this.rules.gravityStrength*dt;d.z+=d.vz*dt;if(previous>=0&&d.z<=0&&surface){d.z=0;d.vz=0;p.grounded=true;p.surface='ビル側面';p.airJumpsUsed=0;d.exiting=false;}}
         if(d.z< -130||d.x< -30||d.x>WIDTH+30||d.y< -30||d.y>HEIGHT+30){this.die('ビルの側面から落下しました。');return;}
-        const goal=cityEntryPoint(this.level,this.level.goal[0],this.level.goal[1]-80);
-        if(p.grounded&&Math.hypot(d.x-goal.x,d.y-goal.y)<18){this.won=true;this.running=false;this.lastEvent='win';}
+        if(d.exiting&&d.z>=28){this.won=true;this.running=false;this.lastEvent='win';}
       }
       p.x=d.x-p.w/2;p.y=d.y-p.h/2;
     }
@@ -381,6 +381,6 @@
       if(intersects(p,{x:goalX-18,y:goalY-64,w:36,h:64})){this.won=true;this.running=false;this.lastEvent='win';}
     }
   }
-  const api={Game,LEVELS,defaultStage,CITY_BUILDINGS,citySurfaceAt,cityEntryPoint,depthProjection,WIDTH,HEIGHT,GRAVITY,isHan,parseNumber,evaluateRule,evaluateStageRule,validateBindings,EFFECTS,inputBox,sentenceParts,validateStage,spikeTriangles,spikeIntersects,buildMask,maskIntersects};
+  const api={Game,LEVELS,defaultStage,CITY_BUILDINGS,citySurfaceAt,cityEntryPoint,atDepthExit,depthProjection,WIDTH,HEIGHT,GRAVITY,isHan,parseNumber,evaluateRule,evaluateStageRule,validateBindings,EFFECTS,inputBox,sentenceParts,validateStage,spikeTriangles,spikeIntersects,buildMask,maskIntersects};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Kotonoha=api;
 })(typeof window!=='undefined'?window:globalThis);

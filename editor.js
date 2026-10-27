@@ -61,9 +61,10 @@ class StageEditor{
   }
   notify(message,error=false){this.options.notify(message,error);}
   begin(){if(!this.active){this.options.onBegin();this.active=true;}}
-  open(){this.begin();if(!this.document||!this.testing){this.document=new StageDocument(this.options.getLevel());this.currentId=null;}this.editing=true;this.testing=false;this.drag=null;this.sync();this.notify('地面はドラッグ、スタート・ゴール・入力欄は道具を選んでクリックします。');}
+  open(){this.begin();if(!this.document||(!this.testing&&!this.suspended)){this.document=new StageDocument(this.options.getLevel());this.currentId=null;}this.suspended=false;this.editing=true;this.testing=false;this.drag=null;this.sync();this.notify('地面はドラッグ、スタート・ゴール・入力欄は道具を選んでクリックします。');}
   openRecord(record){this.begin();this.document=new StageDocument(record.stage);this.currentId=record.id;this.editing=true;this.testing=false;this.sync();this.notify('保存したステージを読み込みました。編集または試遊できます。');}
-  close(){this.editing=false;this.testing=false;this.active=false;this.document=null;this.currentId=null;this.options.onClose();this.sync();}
+  suspend(){this.readFields();this.suspended=true;this.editing=false;this.testing=false;this.active=false;this.drag=null;this.erasing=false;this.options.onClose();this.sync();}
+  close(){this.suspended=false;this.editing=false;this.testing=false;this.active=false;this.document=null;this.currentId=null;this.options.onClose();this.sync();}
   changed(){this.sync();}
   sync(){
     const $=s=>document.querySelector(s);$('#editor-panel').hidden=!this.editing;$('#play-sidebar').hidden=this.editing;$('#editor-return').hidden=!this.testing;$('#rule-word').hidden=this.editing;

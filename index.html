@@ -8,7 +8,7 @@
 <title>字形活路 — 漢字でつくるパズル</title>
 <link rel="preload" href="assets/DotGothic16.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/NotoSansCJKjp-Thin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=studio-13">
+<link rel="stylesheet" href="style.css?v=studio-14">
 <script>
 // Show a useful message even when an asset fails before the game starts.
 (function () {
@@ -31,9 +31,9 @@
   });
 }());
 </script>
-<script src="engine.js?v=studio-13" defer></script>
-<script src="editor.js?v=studio-13" defer></script>
-<script src="game.js?v=studio-13" defer></script>
+<script src="engine.js?v=studio-14" defer></script>
+<script src="editor.js?v=studio-14" defer></script>
+<script src="game.js?v=studio-14" defer></script>
 </head>
 <body class="menu-mode" data-screen="home">
 <noscript><p class="notice error">ゲームを遊ぶには、ブラウザのJavaScriptを有効にしてください。</p></noscript>
@@ -58,7 +58,7 @@
 </aside>
 <aside class="ink-panel" id="editor-panel" hidden>
 <p class="eyebrow">STAGE STUDIO / 25px GRID</p><h2>ステージを作る</h2>
-<label class="editor-label" for="editor-title">ステージ名<input id="editor-title" maxlength="40" value="新しいステージ"></label>
+<button id="editor-list" class="secondary">← ステージ一覧へ</button><label class="editor-label" for="editor-title">ステージ名<input id="editor-title" maxlength="40" value="新しいステージ"></label>
 <label class="editor-label" for="editor-background">背景<select id="editor-background"><option value="city">ビルのある背景</option><option value="black">単色の黒</option></select></label><fieldset class="editor-tools"><legend>置くものを選ぶ</legend><button type="button" data-tool="ground" aria-pressed="true">▰ 地面</button><button type="button" data-tool="start" aria-pressed="false">◧ スタート</button><button type="button" data-tool="goal" aria-pressed="false">⇥ ゴール</button><button type="button" data-tool="rule" aria-pressed="false">字 入力欄</button><button type="button" data-tool="crumble" aria-pressed="false">▤ 壊れる床</button><button type="button" data-tool="vine" aria-pressed="false">↟ 蔦</button><button type="button" data-tool="spike" aria-pressed="false">▲ トゲ</button><button type="button" data-tool="erase" aria-pressed="false">× 消す</button></fieldset>
 <div class="editor-row"><label class="editor-label" for="editor-spike-direction">トゲの向き<select id="editor-spike-direction"><option value="0">上 ↑</option><option value="90">右 →</option><option value="180">下 ↓</option><option value="270">左 ←</option><option value="custom">角度を指定</option></select></label><label class="editor-label" for="editor-spike-angle">角度（度）<input id="editor-spike-angle" type="number" min="0" max="359" step="1" value="0"></label></div><p class="editor-help">向き・角度はこれから置くトゲに適用します。0度＝上、90度＝右。クリックで1マス、ドラッグでまとめて配置できます。</p><p id="editor-tool-help" class="editor-help">ドラッグして地面を長方形で描きます。</p>
 <div class="editor-row"><button id="editor-undo" class="secondary">↶ 元に戻す</button><button id="editor-redo" class="secondary">↷ やり直す</button></div>

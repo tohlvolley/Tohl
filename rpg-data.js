@@ -62,12 +62,42 @@ function makeProject(){
  dialog('story_opening_2','王・文成','姫の紬は最後の漢字を守ろうとして、魔王にさらわれた。どうか五つの地に封じられた漢字を取り戻し、魔王を倒して姫を助けてほしい。',[{label:'次へ',next:'story_opening_3',conditions:[],actions:[]}]);
  dialog('story_opening_3','王・文成','おぬしには、漢字の画から別の字の力を引き出す才がある。まずは町で支度を整え、緑風の原野へ。核を取り戻すたびに、次の地への道が開く。頼んだぞ。',[{label:'冒険へ出る',conditions:[],actions:[set('story_royal_request')]}]);
  dialog('story_king_return','王・文成','姫を、そして奪われた漢字を取り戻してくれ。核の解放が、次の地への道を開くはずだ。');
- const town=p.maps[0];town.name='はじまりの町・緑風の原野';
- entity(town,{id:'story_king_actor',kind:'npc',name:'王・文成',x:6,y:4,character:'story_king',dialog:'story_king_return'});paint(town,6,4,3);
- town.buildings=[{x:2,y:13,w:4,h:3,label:'宿',color:'#866655'},{x:10,y:13,w:4,h:3,label:'商店',color:'#637e96'},{x:17,y:3,w:4,h:3,label:'民家',color:'#85705e'},{x:17,y:9,w:4,h:3,label:'民家',color:'#7b655e'},{x:2,y:2,w:3,h:2,label:'王の館',color:'#7d7399'}];
- town.entities.find(e=>e.id==='w0_inn').x=4;town.entities.find(e=>e.id==='w0_inn').y=16;town.entities.find(e=>e.id==='w0_shop').x=12;town.entities.find(e=>e.id==='w0_shop').y=16;
- for(const b of town.buildings){for(let y=b.y;y<b.y+b.h;y++)for(let x=b.x;x<b.x+b.w;x++)town.tiles[y*town.width+x]=8;road(town,[6,7],[b.x+Math.floor(b.w/2),b.y+b.h]);}
+ flag('tutorial_complete','漢字の練習を終えた');
+ const field=p.maps.find(m=>m.id==='w0_field');
+ const town=baseMap('w0_town','はじまりの町',0,24,26,false);town.spawn=[11,10];town.encounters=[];town.encounterRate=0;town.safeRadius=30;
+ town.tiles=Array.from({length:24*26},(_,i)=>{const x=i%24,y=Math.floor(i/24);return x===0||y===0||x===23||y===25?8:0;});
+ road(town,[11,10],[12,24]);
+ town.buildings=[{x:3,y:3,w:6,h:4,label:'王の館',color:'#7775a5',room:'town_palace'},{x:3,y:12,w:5,h:4,label:'宿',color:'#a36449',room:'town_inn'},{x:15,y:3,w:5,h:4,label:'商店',color:'#537d9b',room:'town_shop'},{x:15,y:12,w:5,h:4,label:'民家',color:'#8a6852',room:'town_home'},{x:10,y:18,w:4,h:3,label:'道場',color:'#527c67',room:'town_school'}];
+ const rooms=[];
+ for(const [i,b] of town.buildings.entries()){
+  const doorX=b.x+Math.floor(b.w/2),doorY=b.y+b.h-1;road(town,[11,10],[doorX,doorY+1]);
+  for(let y=b.y;y<b.y+b.h;y++)for(let x=b.x;x<b.x+b.w;x++)town.tiles[y*town.width+x]=8;
+  town.tiles[doorY*town.width+doorX]=3;
+  const room=baseMap(b.room,b.label,0,12,12,false);room.interior=true;room.encounters=[];room.encounterRate=0;room.safeRadius=30;room.spawn=[6,9];room.tiles=Array.from({length:144},(_,j)=>{const x=j%12,y=Math.floor(j/12);return x===0||y===0||x===11||y===11?8:7;});room.tiles[11*12+6]=3;
+  room.furniture=i===0?[{kind:'rug',x:5,y:3},{kind:'rug',x:6,y:4},{kind:'bookshelf',x:2,y:2},{kind:'bookshelf',x:9,y:2}]:i===1?[{kind:'bed',x:2,y:3},{kind:'bed',x:3,y:3},{kind:'bed',x:8,y:3},{kind:'table',x:8,y:6}]:i===2?[{kind:'table',x:3,y:4},{kind:'table',x:4,y:4},{kind:'bookshelf',x:2,y:2},{kind:'bookshelf',x:8,y:2}]:i===3?[{kind:'bed',x:2,y:3},{kind:'table',x:7,y:4},{kind:'bookshelf',x:8,y:2}]:[{kind:'rug',x:5,y:5},{kind:'rug',x:6,y:5},{kind:'bookshelf',x:2,y:2}];
+  for(const f of room.furniture)if(f.kind!=='rug')room.tiles[f.y*12+f.x]=5;
+  entity(town,{id:`town_door_${i}`,kind:'portal',name:b.label,x:doorX,y:doorY,touch:true,actions:[{type:'travel',map:room.id}]});
+  entity(room,{id:`${room.id}_exit`,kind:'portal',name:'町へ',x:6,y:11,touch:true,actions:[{type:'travel',map:town.id,x:doorX,y:doorY+1}]});rooms.push(room);
+ }
+ entity(rooms[0],{id:'story_king_actor',kind:'npc',name:'王・文成',x:6,y:3,character:'story_king',dialog:'story_king_return'});
+ entity(rooms[1],{id:'town_host',kind:'healer',name:'宿の主人：全回復',x:6,y:3,character:'w0_healer'});
+ entity(rooms[2],{id:'town_merchant',kind:'merchant',name:'道具と装備の店',x:6,y:3,character:'w0_request'});
+ dialog('town_neighbor','町の人','王の館は北西、道場は町の南にあるよ。王の依頼を聞いて、道場で漢字の使い方を練習したら、南の門から原野へ出られる。町と家の中には魔物はいないから、ゆっくり支度をしてね。');
+ p.characters.push({id:'town_neighbor',name:'町の人',color:'#bba15c',appearance:'ranger',dialog:'town_neighbor'},{id:'tutorial_teacher',name:'師範',color:'#a5b6cf',appearance:'warrior',dialog:'tutorial_intro'});
+ entity(rooms[3],{id:'town_home_actor',kind:'npc',name:'町の人',x:6,y:3,character:'town_neighbor',dialog:'town_neighbor'});entity(town,{id:'town_neighbor_actor',kind:'npc',name:'町の人',x:10,y:10,character:'town_neighbor',dialog:'town_neighbor'});
+ p.enemies.push({id:'tutorial_dummy',name:'練習用の木人',element:'wood',shape:'golem',color:'#ba9764',hp:18,attack:1,defense:0,exp:0,gold:0,world:0,boss:false,training:true});
+ dialog('tutorial_intro','師範','矢印で歩き、Spaceで話す。メニューはXかEscで開ける。家の入口には歩いて触れれば入れるぞ。\n\nいま構えられるのは一画の漢字だ。「一」を構え、画番号に「1」を入力して発動してみよう。選んだ画は黄色になる。どんな力が出るかは、発動して確かめるのだ。',[{label:'漢字を練習する',conditions:[],actions:[{type:'battle',enemy:'tutorial_dummy'},set('tutorial_complete'),{type:'heal'},{type:'dialog',dialog:'tutorial_done'}]},{label:'あとで練習する',conditions:[],actions:[]}]);
+ dialog('tutorial_done','師範','よくできた。HPとMPは全回復しておいた。レベルが上がれば、より画数の多い漢字を構えられる。対応表はメニューの「漢字・画数」から見られるぞ。王の依頼も受けたら、南の門から冒険へ出よう。');
+ entity(rooms[4],{id:'tutorial_teacher_actor',kind:'npc',name:'師範：漢字の練習',x:6,y:3,character:'tutorial_teacher',dialog:'tutorial_intro'});
+ town.tiles[25*24+12]=3;entity(town,{id:'town_adventure_exit',kind:'portal',name:'緑風の原野へ',x:12,y:25,touch:true,conditions:[cond('story_royal_request'),cond('tutorial_complete')],blockedText:'王の依頼を受け、南の道場で漢字を練習してから出発しよう。',actions:[{type:'travel',map:field.id}]});
+ entity(field,{id:'field_town_return',kind:'portal',name:'はじまりの町へ',x:5,y:7,touch:true,actions:[{type:'travel',map:town.id,x:12,y:24}]});
+ p.maps.unshift(town);p.maps.push(...rooms);
  return p;
 }
-const api={ELEMENTS,TILES,WALKABLE,ITEMS,WORLDS,makeProject,rng};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.RPGData=api;
+function upgradeProject(project){if(project.maps.some(m=>m.id==='w0_town')||!project.maps.some(m=>m.id==='w0_field'&&['はじまりの町・緑風の原野','緑風の原野'].includes(m.name)))return project;
+ const p=JSON.parse(JSON.stringify(project)),fresh=makeProject(),field=p.maps.find(m=>m.id==='w0_field');field.name='緑風の原野';for(const b of field.buildings||[])for(let y=b.y;y<b.y+b.h;y++)for(let x=b.x;x<b.x+b.w;x++)field.tiles[y*field.width+x]=3;delete field.buildings;field.entities=field.entities.filter(e=>e.id!=='story_king_actor');field.entities.push(JSON.parse(JSON.stringify(fresh.maps.find(m=>m.id==='w0_field').entities.find(e=>e.id==='field_town_return'))));
+ for(const key of ['flags','characters','dialogs','enemies'])for(const entry of fresh[key])if(!p[key].some(e=>e.id===entry.id))p[key].push(JSON.parse(JSON.stringify(entry)));
+ const extra=fresh.maps.filter(m=>m.id==='w0_town'||m.id.startsWith('town_'));p.maps.unshift(JSON.parse(JSON.stringify(extra.find(m=>m.id==='w0_town'))));p.maps.push(...JSON.parse(JSON.stringify(extra.filter(m=>m.id!=='w0_town'&&!p.maps.some(old=>old.id===m.id)))));return p;
+}
+const api={ELEMENTS,TILES,WALKABLE,ITEMS,WORLDS,makeProject,upgradeProject,rng};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.RPGData=api;
 })(typeof window!=='undefined'?window:globalThis);

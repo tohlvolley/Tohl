@@ -24,3 +24,4 @@ body[data-screen="home"] header,body[data-screen="list"] header,header #editor-o
 body.editing .stage-panel{position:sticky;top:20px}body.editing .stage-status{display:none}@media(max-width:850px){body.editing .stage-panel{position:static}}
 
 .stage-card{padding:0}.stage-card .stage-thumbnail{display:grid;place-items:center;aspect-ratio:2;margin:0;background:#101d31;color:#d7e6ef;font-size:64px;font-weight:400}.stage-count-settings{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:0 0 24px;font-size:13px}.stage-count-settings input{width:85px;padding:9px;color:#d7e6ef;background:#101e30;border:1px solid #395065}.stage-count-settings p{flex-basis:100%;color:var(--muted);font-size:11px;margin:0}body[data-screen=play] .stage-thumbnail{display:none}
+.arcade-return{display:block;text-decoration:none;text-align:center;font-size:14px;padding:16px}

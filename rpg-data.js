@@ -15,7 +15,7 @@ function baseMap(id,name,world,w,h,dungeon){const random=rng(200+world*71+(dunge
 function paint(map,x,y,tile,r=0){for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++)if(x+dx>0&&y+dy>0&&x+dx<map.width-1&&y+dy<map.height-1)map.tiles[(y+dy)*map.width+x+dx]=tile;}
 function road(map,a,b){const t=map.dungeon?7:3;let [x,y]=a;paint(map,x,y,t,1);while(x!==b[0]){x+=Math.sign(b[0]-x);paint(map,x,y,t,1);}while(y!==b[1]){y+=Math.sign(b[1]-y);paint(map,x,y,t,1);}}
 function makeProject(){
- const p={format:'gokai-rpg-project',version:1,title:'五界の旅人',maps:[],enemies:[],characters:[],dialogs:[],flags:[],quests:[]};
+ const p={format:'gokai-rpg-project',version:1,title:'五界の旅人',kanjiEffects:[],maps:[],enemies:[],characters:[],dialogs:[],flags:[],quests:[]};
  const flag=(id,name,type='boolean',initial=false)=>p.flags.push({id,name,type,initial});
  const cond=(id,value=true,op='eq')=>({flag:id,op,value});
  const set=(id,value=true)=>({type:'setFlag',flag:id,value});const item=(id,amount=1)=>({type:'item',item:id,amount});
@@ -33,7 +33,7 @@ function makeProject(){
   const guideId=`${pre}_guide`,questId=`${pre}_request`,healId=`${pre}_healer`;
   const mainChoices=[{label:'旅の目的を聞く',next:`${pre}_advice`,conditions:[],actions:[]},{label:'ここまでの道をたどる',next:`${pre}_lore_hint`,conditions:[],actions:[]}];
   dialog(guideId,'道しるべの案内人',world.story,mainChoices);dialog(`${pre}_advice`,'道しるべの案内人','地図に記した三つの標で守護者を倒すと、ダンジョンの門が開く。内部の三つの封印を解けば、核の番人に挑める。標の近くでは魔力も回復できる。道を外れた宝箱や記録も探してみてほしい。');
-  dialog(`${pre}_lore_hint`,'道しるべの案内人',`記録は原野の東側、古い石碑のそばにある。${n===0?'火は木に、木は水に、水は火に強い。日と月は互いに弱点だ。':'前の世界へは旅のメニューから戻れる。拠点の宿と商店も忘れずに。'}`);
+  dialog(`${pre}_lore_hint`,'道しるべの案内人',`記録は原野の東側、古い石碑のそばにある。${n===0?'漢字を戦闘前に構え、画を選ぶと、その画数分のMPで術が出る。明なら1・2・3・4画が日、5・6・7・8画が月、1・2・4画が口だ。火は木に、木は水に、水は火に強い。日と月は互いに弱点だ。':'前の世界へは旅のメニューから戻れる。拠点の宿と商店も忘れずに。'}`);
   const requests=[{id:`${pre}_quest0`,title:'街道の安全',description:'この世界の敵を8体倒し、拠点の依頼係へ報告する。',conditions:[cond(`${pre}_kills`,8,'gte')],reward:[{type:'gold',amount:100+n*60},item('ether',2)]},{id:`${pre}_quest1`,title:'失われた物資',description:'この世界で宝箱を3個見つけ、依頼係へ報告する。',conditions:[cond(`${pre}_caches`,3,'gte')],reward:[{type:'gold',amount:120+n*70},item('potion',3)]},{id:`${pre}_quest2`,title:'古い記録',description:'東の石碑で世界の記録を読み、依頼係へ報告する。',conditions:[cond(`${pre}_lore`)],reward:[{type:'gold',amount:100+n*70},item('antidote',3)]}];
   const questChoices=[];requests.forEach(q=>{p.quests.push({id:q.id,title:q.title,description:q.description,world:n,conditions:q.conditions,completeFlag:q.id});questChoices.push({label:`「${q.title}」を報告する`,conditions:[...q.conditions,cond(q.id,false)],actions:[...q.reward,set(q.id)]});});
   dialog(questId,'拠点の依頼係','依頼は三つ。街道の敵を8体討伐、宝箱を3個発見、そして東の石碑の記録の調査だ。条件を満たせば、ここで報酬を受け取れる。',questChoices);

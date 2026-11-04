@@ -15,7 +15,7 @@ function baseMap(id,name,world,w,h,dungeon){const random=rng(200+world*71+(dunge
 function paint(map,x,y,tile,r=0){for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++)if(x+dx>0&&y+dy>0&&x+dx<map.width-1&&y+dy<map.height-1)map.tiles[(y+dy)*map.width+x+dx]=tile;}
 function road(map,a,b){const t=map.dungeon?7:3;let [x,y]=a;paint(map,x,y,t,1);while(x!==b[0]){x+=Math.sign(b[0]-x);paint(map,x,y,t,1);}while(y!==b[1]){y+=Math.sign(b[1]-y);paint(map,x,y,t,1);}}
 function makeProject(){
- const p={format:'gokai-rpg-project',version:1,title:'五界の旅人',kanjiEffects:[],maps:[],enemies:[],characters:[],dialogs:[],flags:[],quests:[]};
+ const p={format:'gokai-rpg-project',version:1,title:'五界の旅人',kanjiEffects:[],kanjiMappings:[],maps:[],enemies:[],characters:[],dialogs:[],flags:[],quests:[]};
  const flag=(id,name,type='boolean',initial=false)=>p.flags.push({id,name,type,initial});
  const cond=(id,value=true,op='eq')=>({flag:id,op,value});
  const set=(id,value=true)=>({type:'setFlag',flag:id,value});const item=(id,amount=1)=>({type:'item',item:id,amount});

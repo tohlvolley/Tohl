@@ -1,0 +1,1 @@
+(function(){const canvas=document.querySelector('#rpg-thumbnail');if(canvas&&window.RPGArt)RPGArt.battleScene(canvas.getContext('2d'),RPGData.WORLDS[0],{shape:'treant',color:'#85c680',boss:false},0);})();

@@ -55,5 +55,13 @@ function marker(ctx,entity,x,y,size,project,flags={}){const color=D.ELEMENTS[D.W
  ctx.restore();}
 function battleScene(ctx,world,enemy,clock){const {width:w,height:h}=ctx.canvas;const sky=ctx.createLinearGradient(0,0,0,h);sky.addColorStop(0,world.id===3?'#6d6959':world.id===4?'#202039':'#263c4e');sky.addColorStop(1,world.colors[0]);ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
  ctx.fillStyle=world.colors[2];for(let i=0;i<12;i++){const x=i*w/11,y=h*.45+(i*37%60);ctx.fillRect(x,y,w/9,h-y);ctx.fillRect(x+12,y-35,w/18,35);}ctx.fillStyle=world.colors[1];ctx.beginPath();ctx.ellipse(w/2,h*.86,w*.43,h*.16,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#151e2b55';ctx.beginPath();ctx.ellipse(w/2,h*.82,enemy.boss?115:85,16,0,0,Math.PI*2);ctx.fill();drawEnemy(ctx,enemy,w/2,h*.86,enemy.boss?260:210,clock);}
-root.RPGArt={shade,enemySprite,drawEnemy,human,tile,marker,battleScene};
+function portrait(ctx,character,speaker){
+ const w=ctx.canvas.width,h=ctx.canvas.height;ctx.imageSmoothingEnabled=false;ctx.fillStyle='#202b40';ctx.fillRect(0,0,w,h);ctx.fillStyle='#35445a';ctx.fillRect(12,12,w-24,h-24);
+ const royal=/王|姫/.test(speaker),princess=/姫/.test(speaker);const color=character?.color||'#9eb9c1';human(ctx,w/2,h*.78,color,character?.appearance||'scholar',4,0);
+ if(royal){ctx.fillStyle='#e8c86b';const x=w/2;ctx.fillRect(x-24,h*.78-108,48,10);for(let i=0;i<3;i++)ctx.fillRect(x-24+i*20,h*.78-120,8,14);}
+ if(!character&&/魔王|古樹|海蛇|飛竜|グリフォン/.test(speaker)){ctx.fillStyle='#202b40';ctx.fillRect(0,0,w,h);drawEnemy(ctx,{shape:'dragon',color:'#9b73bb'},w/2,h*.92,h*.8);}
+ if(princess){ctx.fillStyle='#f6d4e4';ctx.fillRect(w/2-14,h*.78-50,28,34);}
+}
+function building(ctx,b,x,y,size){const w=b.w*size,h=b.h*size;ctx.fillStyle='#15202b88';ctx.fillRect(x+5,y+8,w,h);ctx.fillStyle=b.color;ctx.fillRect(x,y+size*.7,w,h-size*.7);ctx.fillStyle=shade(b.color,-35);ctx.beginPath();ctx.moveTo(x-5,y+size);ctx.lineTo(x+w/2,y-12);ctx.lineTo(x+w+5,y+size);ctx.closePath();ctx.fill();ctx.fillStyle='#debe84';for(let i=0;i<b.w-1;i++){ctx.fillRect(x+12+i*size,y+size*1.25,12,16);ctx.fillStyle='#debe84';}ctx.fillStyle='#2c2530';ctx.fillRect(x+w/2-9,y+h-26,18,26);ctx.fillStyle='#f0dfba';ctx.font='12px monospace';ctx.textAlign='center';ctx.fillText(b.label,x+w/2,y+h+14);ctx.textAlign='start';}
+root.RPGArt={portrait,building,shade,enemySprite,drawEnemy,human,tile,marker,battleScene};
 })(window);

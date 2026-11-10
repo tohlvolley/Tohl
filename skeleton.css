@@ -3,3 +3,5 @@
 @media(prefers-reduced-motion:no-preference){button{transition:background-color .12s,border-color .12s}.cell.last{animation:placed .25s ease-out}@keyframes placed{from{transform:scale(.85)}to{transform:scale(1)}}}
 
 .result-details{font-size:12px;margin:18px 0;line-height:1.8}.result-details summary{cursor:pointer}.result-details textarea{display:block;width:100%;padding:12px;border:1px solid var(--line);background:#fffdf8;color:var(--ink);font:12px/1.8 monospace;resize:vertical}.result li small{font-size:11px}
+
+#pending-letter:empty{display:none}#rules-dialog{max-width:520px;width:calc(100% - 32px);padding:26px;border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink)}#rules-dialog::backdrop{background:#183c3a66}#rules-dialog ul{padding-left:20px;line-height:1.9;font-size:13px}#rules-dialog li{margin-bottom:12px}.claim-panel{margin-top:16px}.game-footer{font-size:10px}.game-header{gap:16px}

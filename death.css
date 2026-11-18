@@ -13,3 +13,5 @@
 .play-header>.hud-items{padding:0;border:0;background:transparent;backdrop-filter:none}.touch-pad{bottom:auto!important;top:166px;left:14px!important}@media(max-width:700px){.item-slot{padding:4px!important;width:52px}.touch-pad{top:164px}}
 
 #message-speaker[data-actor="gm"]{color:#94d7ce}
+
+.footer-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}.footer-actions button{padding:6px 9px;font-size:11px}#posture-controls{display:flex;gap:5px}#command-form[hidden]{display:none}.fallback-dice{display:flex;flex-wrap:wrap;gap:8px}.fallback-face{font-size:38px!important;line-height:1!important;padding:5px!important;border-radius:7px!important;background:#e7dfc9;color:#152027}.fallback-face:disabled{background:#30373d;color:#171d22;opacity:1}.fallback-face.selected{outline:2px solid #dfbd73}#command-toggle.active{color:#f1d394}#skip-alchemy{border-color:#95bbb1;background:#213632}.command-console:has(#command-form[hidden]) #narration{margin-bottom:4px}

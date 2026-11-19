@@ -2,7 +2,7 @@ import './death-engine.js?v=7';
 import './death-story.js?v=7';
 import {StoryEditor} from './death-editor.js?v=7';
 import './death-commands.js?v=7';
-import {DeathScene} from './death-scene.js?v=7';
+import {DeathScene} from './death-scene.js?v=8';
 const S=window.SixthStory,E=window.SixthEngine,C=window.SixthCommands,$=s=>document.querySelector(s),SAVE='sixth-cast-save-v1';
 let storyStorage=null;try{storyStorage=localStorage;}catch{}const story=new S.Store(storyStorage),reveal=new S.Reveal();let currentNarrative=null;
 const editor=new StoryEditor(story,{onOpen:()=>{reveal.finish();pause();},onClose:()=>{if(currentNarrative)say(currentNarrative.id,currentNarrative.vars);pause();}});

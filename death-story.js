@@ -10,72 +10,72 @@ const ENTRIES=[
   {
     "id": "intro.host",
     "category": "導入",
-    "label": "主の挨拶",
-    "speaker": "霧島 — ゲームの主",
-    "text": "「ようこそ。俺は霧島。この部屋の主であり、お前の対戦相手だ。これから行うゲームを説明しよう」"
+    "label": "参加者との対面",
+    "speaker": "霧島",
+    "text": "「霧島だ。……俺も気が付いたらここにいた。あんたも、ここの参加者か？」"
   },
   {
     "id": "rule.1",
     "category": "ルール",
     "label": "ルール 1",
-    "speaker": "霧島 — ゲームの主",
-    "text": "「机の上でサイコロを振る。振り終わった後は動かしてはいけない。」"
+    "speaker": "GM — ルール説明",
+    "text": "「ゲームマスターです。これからルールを説明します。机の上でサイコロを振る。振り終わった後は動かしてはいけない。」"
   },
   {
     "id": "rule.2",
     "category": "ルール",
     "label": "ルール 2",
-    "speaker": "霧島 — ゲームの主",
+    "speaker": "GM — ルール説明",
     "text": "「目視できる異なる3面を指定する。辺同士で隣り合う面をつないで選ぶこと。」"
   },
   {
     "id": "rule.3",
     "category": "ルール",
     "label": "ルール 3",
-    "speaker": "霧島 — ゲームの主",
+    "speaker": "GM — ルール説明",
     "text": "「選んだ3面の目を合計する。1=A、2=B……26=Z。その数字に対応するアルファベットを1文字与える。」"
   },
   {
     "id": "rule.4",
     "category": "ルール",
     "label": "ルール 4",
-    "speaker": "霧島 — ゲームの主",
+    "speaker": "GM — ルール説明",
     "text": "「続いて、先に指定した3面以外の見える面を3回指定する。同じ面を繰り返してもいい。それぞれの目の数字から、さらに1文字ずつ得られる。」"
   },
   {
     "id": "rule.5",
     "category": "ルール",
     "label": "ルール 5",
-    "speaker": "霧島 — ゲームの主",
+    "speaker": "GM — ルール説明",
     "text": "「得た4文字と、持ち越した文字を組み合わせ、机の上にある品の英語名を作る。GMがその品の複製を渡す。1回に複数の品を作っても、作らなくてもいい。複数形でも1語につき1個だ。使った文字はなくなる。」"
   },
   {
     "id": "rule.6",
     "category": "ルール",
     "label": "ルール 6",
-    "speaker": "霧島 — ゲームの主",
+    "speaker": "GM — ルール説明",
     "text": "「これを6回行い、錬成したカードから5枚を選んでポーカーで対決する。机の上にはトランプ53枚1組がある。これは複製元であり、そのまま手札にはできない。自分の6回が終わったら、相手が6回行う。」"
   },
   {
     "id": "rule.7",
     "category": "ルール",
     "label": "ルール 7",
-    "speaker": "霧島 — ゲームの主",
+    "speaker": "GM — ルール説明",
     "text": "「通常のポーカーの役の順で勝敗を決める。5枚未満の手はハイカードより弱い。同じ数字の実物カードを5枚持った時点で、即失格だ。」"
   },
   {
     "id": "intro.end",
     "category": "導入",
     "label": "説明の終わり",
-    "speaker": "霧島 — ゲームの主",
-    "text": "「説明は以上だ。ルールはいつでも読み返せる。では、目の前のサイコロを振れ。お前から6回だ」"
+    "speaker": "GM — ルール説明",
+    "text": "「説明は以上です。ルールはいつでも読み返せます。では、先攻の方からサイコロを振ってください」"
   },
   {
     "id": "host.start",
     "category": "導入",
-    "label": "最初の投擲の指示",
-    "speaker": "霧島 — ゲームの主",
-    "text": "「では、サイコロを振れ」"
+    "label": "参加者のひとこと",
+    "speaker": "霧島",
+    "text": "「……やるしかなさそうだな。先にどうぞ」"
   },
   {
     "id": "inspect.deck",
@@ -130,36 +130,36 @@ const ENTRIES=[
     "id": "talk.early",
     "category": "会話",
     "label": "最初の呼びかけ",
-    "speaker": "霧島 — ゲームの主",
-    "text": "「この部屋では、俺が相手をする。準備は自分の目で確かめるんだ」"
+    "speaker": "霧島",
+    "text": "「あんたも連れて来られたのか。……お互い、ここから出たいもんだな」"
   },
   {
     "id": "talk.later",
     "category": "会話",
     "label": "2投目以降の呼びかけ",
-    "speaker": "霧島 — ゲームの主",
-    "text": "「回数は限られている。次の一投をどう使う？」"
+    "speaker": "霧島",
+    "text": "「回数は限られてる。お互い、一投ずつ考えるしかないな」"
   },
   {
     "id": "talk.where",
     "category": "会話",
     "label": "ここはどこだ",
-    "speaker": "霧島 — ゲームの主",
-    "text": "「俺が用意した勝負の部屋だ。扉を開ける条件は、俺に勝つこと」"
+    "speaker": "霧島",
+    "text": "「俺にも分からない。気が付いたら、この椅子に座らされてたんだ」"
   },
   {
     "id": "talk.gm",
     "category": "会話",
     "label": "錬成を担当するのは？",
-    "speaker": "霧島 — ゲームの主",
-    "text": "「品の複製を管理するのは別のGMだ。面を指定し終えたら、そちらの指示を聞け」"
+    "speaker": "霧島",
+    "text": "「右のモニターに出るGMだろう。俺も、さっき聞いたことしか知らない」"
   },
   {
     "id": "talk.turn",
     "category": "会話",
     "label": "相手の番について",
-    "speaker": "霧島 — ゲームの主",
-    "text": "「お前の6回が終わってから、俺が6回やる。焦らず続けろ」"
+    "speaker": "霧島",
+    "text": "「GMの説明だと、あんたが6回やってから俺の6回だ。先攻と後攻を決めたのも、あいつらだよ」"
   },
   {
     "id": "gm.alchemy.start",
@@ -275,13 +275,22 @@ const ENTRIES=[
   }
 ];
 
+const PREVIOUS={"intro.host": {"speaker": "霧島 — ゲームの主", "text": "「ようこそ。俺は霧島。この部屋の主であり、お前の対戦相手だ。これから行うゲームを説明しよう」"}, "rule.1": {"speaker": "霧島 — ゲームの主", "text": "「机の上でサイコロを振る。振り終わった後は動かしてはいけない。」"}, "rule.2": {"speaker": "霧島 — ゲームの主", "text": "「目視できる異なる3面を指定する。辺同士で隣り合う面をつないで選ぶこと。」"}, "rule.3": {"speaker": "霧島 — ゲームの主", "text": "「選んだ3面の目を合計する。1=A、2=B……26=Z。その数字に対応するアルファベットを1文字与える。」"}, "rule.4": {"speaker": "霧島 — ゲームの主", "text": "「続いて、先に指定した3面以外の見える面を3回指定する。同じ面を繰り返してもいい。それぞれの目の数字から、さらに1文字ずつ得られる。」"}, "rule.5": {"speaker": "霧島 — ゲームの主", "text": "「得た4文字と、持ち越した文字を組み合わせ、机の上にある品の英語名を作る。GMがその品の複製を渡す。1回に複数の品を作っても、作らなくてもいい。複数形でも1語につき1個だ。使った文字はなくなる。」"}, "rule.6": {"speaker": "霧島 — ゲームの主", "text": "「これを6回行い、錬成したカードから5枚を選んでポーカーで対決する。机の上にはトランプ53枚1組がある。これは複製元であり、そのまま手札にはできない。自分の6回が終わったら、相手が6回行う。」"}, "rule.7": {"speaker": "霧島 — ゲームの主", "text": "「通常のポーカーの役の順で勝敗を決める。5枚未満の手はハイカードより弱い。同じ数字の実物カードを5枚持った時点で、即失格だ。」"}, "intro.end": {"speaker": "霧島 — ゲームの主", "text": "「説明は以上だ。ルールはいつでも読み返せる。では、目の前のサイコロを振れ。お前から6回だ」"}, "host.start": {"speaker": "霧島 — ゲームの主", "text": "「では、サイコロを振れ」"}, "talk.early": {"speaker": "霧島 — ゲームの主", "text": "「この部屋では、俺が相手をする。準備は自分の目で確かめるんだ」"}, "talk.later": {"speaker": "霧島 — ゲームの主", "text": "「回数は限られている。次の一投をどう使う？」"}, "talk.where": {"speaker": "霧島 — ゲームの主", "text": "「俺が用意した勝負の部屋だ。扉を開ける条件は、俺に勝つこと」"}, "talk.gm": {"speaker": "霧島 — ゲームの主", "text": "「品の複製を管理するのは別のGMだ。面を指定し終えたら、そちらの指示を聞け」"}, "talk.turn": {"speaker": "霧島 — ゲームの主", "text": "「お前の6回が終わってから、俺が6回やる。焦らず続けろ」"}};
+const MAX_SCENES=100;
 const KEY='sixth-cast-story-v1',INDEX=new Map(ENTRIES.map(e=>[e.id,e]));
 const clone=x=>JSON.parse(JSON.stringify(x));
-function defaults(){return{format:'sixth-cast-story',version:1,speed:32,lines:Object.fromEntries(ENTRIES.map(e=>[e.id,{speaker:e.speaker,text:e.text}]))};}
+function defaults(){return{format:'sixth-cast-story',version:1,speed:32,scenes:[],lines:Object.fromEntries(ENTRIES.map(e=>[e.id,{speaker:e.speaker,text:e.text}]))};}
 function validLine(value){if(!value||typeof value.speaker!=='string'||value.speaker.length>80||typeof value.text!=='string'||value.text.length>4000||!value.text.trim())throw Error('話者は80文字以内、本文は1〜4000文字で入力してください。');for(const m of value.text.matchAll(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g))if(!['diceCount','round'].includes(m[1]))throw Error('使用できる差し込みは {diceCount} と {round} です。');return{speaker:value.speaker,text:value.text};}
-function validate(raw){if(!raw||raw.format!=='sixth-cast-story'||raw.version!==1||!Number.isInteger(raw.speed)||raw.speed<0||raw.speed>100||!raw.lines||typeof raw.lines!=='object'||Array.isArray(raw.lines))throw Error('対応するセリフJSONを選んでください。');const result=defaults();if(Object.keys(raw.lines).length>ENTRIES.length)throw Error('場面数が不正です。');let total=0;for(const[id,value]of Object.entries(raw.lines)){if(!INDEX.has(id))throw Error('対応していない場面が含まれています。');const first=validLine(value);if(value.follow!==undefined&&(!Array.isArray(value.follow)||value.follow.length>49))throw Error('1場面につきセリフは50個まで追加できます。');const extra=(value.follow||[]).map(validLine);total+=first.text.length+extra.reduce((n,p)=>n+p.text.length,0);if(total>200000)throw Error('セリフ全体は20万文字以内にしてください。');result.lines[id]={...first,...(extra.length?{follow:extra}:{})};}result.speed=raw.speed;return result;}
-function pages(project,id){const value=project.lines[id]||INDEX.get(id);if(!value)throw Error('場面が見つかりません。');return[{speaker:value.speaker,text:value.text},...(value.follow||[]).map(p=>({speaker:p.speaker,text:p.text}))];}
-function setPages(project,id,values){if(!INDEX.has(id)||!Array.isArray(values)||values.length<1||values.length>50)throw Error('1場面のセリフは1〜50個にしてください。');const copy=values.map(p=>({speaker:p.speaker,text:p.text}));project.lines[id]={...copy[0],...(copy.length>1?{follow:copy.slice(1)}:{})};return project;}
+function entries(project){return[...ENTRIES,...(project.scenes||[]).map(e=>({...e,category:'追加した場面'}))];}
+function entry(project,id){return INDEX.get(id)||(project.scenes||[]).find(e=>e.id===id);}
+function validate(raw){if(!raw||raw.format!=='sixth-cast-story'||raw.version!==1||!Number.isInteger(raw.speed)||raw.speed<0||raw.speed>100||!raw.lines||typeof raw.lines!=='object'||Array.isArray(raw.lines))throw Error('対応するセリフJSONを選んでください。');const result=defaults(),custom=raw.scenes===undefined?[]:raw.scenes;if(!Array.isArray(custom)||custom.length>MAX_SCENES)throw Error('追加できる場面は100個までです。');const ids=new Set(INDEX.keys());for(const scene of custom){if(!scene||typeof scene.id!=='string'||!/^custom\.[a-z0-9_-]{1,64}$/.test(scene.id)||ids.has(scene.id)||typeof scene.label!=='string'||!scene.label.trim()||scene.label.length>80||typeof scene.anchor!=='string'||!['before','after'].includes(scene.position))throw Error('場面の名前・表示タイミングを確認してください。');ids.add(scene.id);result.scenes.push({id:scene.id,label:scene.label,anchor:scene.anchor,position:scene.position});}for(const scene of result.scenes){let current=scene;const path=new Set();while(current){if(path.has(current.id))throw Error('場面の表示順が循環しています。');path.add(current.id);if(!ids.has(current.anchor))throw Error('表示タイミングに指定した場面がありません。');current=result.scenes.find(e=>e.id===current.anchor);}}if(Object.keys(raw.lines).length>ids.size)throw Error('場面数が不正です。');let total=0;for(const[id,value]of Object.entries(raw.lines)){if(!ids.has(id))throw Error('対応していない場面が含まれています。');const first=validLine(value);if(value.follow!==undefined&&(!Array.isArray(value.follow)||value.follow.length>49))throw Error('1場面につきセリフは50個まで追加できます。');const extra=(value.follow||[]).map(validLine);total+=first.text.length+extra.reduce((n,p)=>n+p.text.length,0);if(total>200000)throw Error('セリフ全体は20万文字以内にしてください。');const previous=PREVIOUS[id],updated=INDEX.get(id);if(previous&&first.speaker===previous.speaker)first.speaker=updated.speaker;if(previous&&first.text===previous.text)first.text=updated.text;result.lines[id]={...first,...(extra.length?{follow:extra}:{})};}for(const scene of result.scenes)if(!result.lines[scene.id])throw Error('追加した場面のセリフがありません。');result.speed=raw.speed;return result;}
+function plan(project,id){if(!entry(project,id))throw Error('場面が見つかりません。');const result=[],path=new Set();function visit(key){if(path.has(key))throw Error('場面の表示順が循環しています。');path.add(key);for(const scene of project.scenes||[])if(scene.anchor===key&&scene.position==='before')visit(scene.id);result.push(key);for(const scene of project.scenes||[])if(scene.anchor===key&&scene.position==='after')visit(scene.id);path.delete(key);}visit(id);return result;}
+function canAnchor(project,id,anchor){if(!entry(project,anchor))return false;const seen=new Set([id]);let current=anchor;while(current){if(seen.has(current))return false;seen.add(current);current=(project.scenes||[]).find(e=>e.id===current)?.anchor;}return true;}
+function addScene(project,anchor){if(!entry(project,anchor)||(project.scenes||[]).length>=MAX_SCENES)throw Error('これ以上場面を追加できません。');project.scenes??=[];let id;do{id='custom.'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);}while(entry(project,id));project.scenes.push({id,label:'新しい場面',anchor,position:'after'});project.lines[id]={speaker:'',text:'新しい場面のセリフ'};return id;}
+function removeScene(project,id){const scene=(project.scenes||[]).find(e=>e.id===id);if(!scene)throw Error('初期の場面は削除できません。');const order=new Map(ENTRIES.flatMap(e=>plan(project,e.id)).map((key,i)=>[key,i]));for(const child of project.scenes)if(child.anchor===id){child.anchor=scene.anchor;child.position=scene.position;}project.scenes=project.scenes.filter(e=>e.id!==id).sort((a,b)=>order.get(a.id)-order.get(b.id));delete project.lines[id];return scene.anchor;}
+function moveScene(project,id,direction){const scene=(project.scenes||[]).find(e=>e.id===id);if(!scene)throw Error('追加した場面を選んでください。');const peers=project.scenes.filter(e=>e.anchor===scene.anchor&&e.position===scene.position),index=peers.findIndex(e=>e.id===id),other=peers[index+direction];if(!other)throw Error('これ以上移動できません。');const a=project.scenes.indexOf(scene),b=project.scenes.indexOf(other);[project.scenes[a],project.scenes[b]]=[project.scenes[b],project.scenes[a]];}
+function pages(project,id){const value=project.lines[id]||entry(project,id);if(!value)throw Error('場面が見つかりません。');return[{speaker:value.speaker,text:value.text},...(value.follow||[]).map(p=>({speaker:p.speaker,text:p.text}))];}
+function setPages(project,id,values){if(!entry(project,id)||!Array.isArray(values)||values.length<1||values.length>50)throw Error('1場面のセリフは1〜50個にしてください。');const copy=values.map(p=>({speaker:p.speaker,text:p.text}));project.lines[id]={...copy[0],...(copy.length>1?{follow:copy.slice(1)}:{})};return project;}
 function insertPage(project,id,after,value){const list=pages(project,id);if(!Number.isInteger(after)||after<0||after>=list.length||list.length>=50)throw Error('これ以上セリフを追加できません。');list.splice(after+1,0,{speaker:value.speaker,text:value.text});setPages(project,id,list);return after+1;}
 function movePage(project,id,from,to){const list=pages(project,id);if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||to<0||from>=list.length||to>=list.length)throw Error('移動先のセリフが見つかりません。');list.splice(to,0,list.splice(from,1)[0]);setPages(project,id,list);return to;}
 function removePage(project,id,index){const list=pages(project,id);if(!Number.isInteger(index)||index<0||index>=list.length||list.length<=1)throw Error('場面にはセリフを1つ以上残してください。');list.splice(index,1);setPages(project,id,list);return Math.min(index,list.length-1);}
@@ -292,5 +301,5 @@ class Store{constructor(storage){this.storage=storage;this.project=defaults();tr
 class Reveal{constructor(){this.timer=null;this.typing=false;this.serial=0;this.units=[];this.write=()=>{};this.done=()=>{};}cancel(){clearTimeout(this.timer);this.serial++;this.typing=false;}start(text,speed,write,done=()=>{}){this.cancel();this.write=write;this.done=done;this.full=String(text);this.units=typeof Intl.Segmenter==='function'?[...new Intl.Segmenter('ja',{granularity:'grapheme'}).segment(this.full)].map(s=>s.segment):Array.from(this.full);this.index=0;this.typing=this.units.length>0&&speed>0;const serial=this.serial;if(!this.typing){write(this.full);done();return;}write('');const tick=()=>{if(serial!==this.serial)return;this.index++;write(this.units.slice(0,this.index).join(''));if(this.index>=this.units.length){this.typing=false;this.done();}else this.timer=setTimeout(tick,speed);};this.timer=setTimeout(tick,speed);}finish(){if(!this.typing)return false;clearTimeout(this.timer);this.serial++;this.typing=false;this.index=this.units.length;this.write(this.full);this.done();return true;}}
 function turnLocked(phase,rolling=false){return rolling||['trio','bonus','alchemy'].includes(phase);}
 function allowedCommand(phase,type){return !turnLocked(phase)||(phase==='alchemy'?['forge','end','move'].includes(type):['faces','move'].includes(type));}
-const api={ENTRIES,KEY,defaults,validate,line,pages,setPages,insertPage,movePage,removePage,sequence,Store,Reveal,turnLocked,allowedCommand};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.SixthStory=api;
+const api={ENTRIES,KEY,MAX_SCENES,entries,entry,plan,canAnchor,addScene,removeScene,moveScene,defaults,validate,line,pages,setPages,insertPage,movePage,removePage,sequence,Store,Reveal,turnLocked,allowedCommand};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.SixthStory=api;
 })(typeof window!=='undefined'?window:globalThis);

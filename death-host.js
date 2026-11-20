@@ -45,3 +45,22 @@ export function createHost(){const group=new T.Group(),cloth=material('#181a1c',
  const upperBody=group,root=new T.Group();root.name='kirishima';root.add(upperBody);upperBody.name='upper-body';const seatedLegs=makeLegs(root,false,cloth,black,silk),standingLegs=makeLegs(root,true,cloth,black,silk);let pose='seated';standingLegs.visible=false;
  function setPose(next){if(pose===next)return;pose=next;const standing=next==='standing';seatedLegs.visible=!standing;standingLegs.visible=standing;upperBody.position.y=standing?.12:0;arms.forEach((arm,i)=>{arm.rotation.x=standing?.72:0;arm.rotation.z=standing?(i===0?-.06:.06):0;});}
  return{group:root,head,torso,setPose,get pose(){return pose;},tick(time,talking){if(talking){head.rotation.x=Math.sin(time*.004)*.014;head.rotation.y=Math.sin(time*.0017)*.045;torso.scale.y=1+Math.sin(time*.002)*.0015;}else{head.rotation.set(0,0,0);torso.scale.y=1;}}};}
+
+// Kirishima is a fellow participant, in everyday clothes. The masked model is the GM.
+export function createParticipant(){
+ const root=new T.Group();root.name='kirishima-participant';const upper=new T.Group();upper.name='upper-body';root.add(upper);
+ const cloth=material('#35434e',.98),rib=material('#26323b',.98),pants=material('#514c44',.98),skin=material('#b98e73',.88),hair=material('#24201e',.96),shoe=material('#333438',.95),seam=material('#77736b',.98);
+ const torso=mesh(upper,new T.LatheGeometry([[.23,.73],[.26,.83],[.275,1.08],[.32,1.34],[.30,1.43],[.15,1.49]].map(p=>new T.Vector2(...p)),40),cloth);torso.scale.z=.65;
+ for(const y of[.77,1.46]){const band=mesh(upper,new T.CylinderGeometry(y>1?.135:.235,y>1?.14:.24,.045,32),rib,[0,y,0]);band.scale.z=y>1?.9:.67;}
+ mesh(upper,new T.CylinderGeometry(.09,.105,.22,24),skin,[0,1.54,0]);
+ const head=new T.Group();head.position.set(0,1.79,0);upper.add(head);const skull=mesh(head,new T.SphereGeometry(1,40,32),skin);skull.scale.set(.167,.235,.153);
+ const cap=mesh(head,new T.SphereGeometry(1,40,24,0,Math.PI*2,0,1.65),hair,[0,.035,-.012]);cap.scale.set(.175,.218,.158);
+ for(const side of[-1,1]){mesh(head,new T.SphereGeometry(1,20,16),skin,[side*.165,-.015,0]).scale.set(.032,.055,.025);const eye=mesh(head,new T.SphereGeometry(1,20,12),material('#ddd3c1'),[side*.066,.025,.139]);eye.scale.set(.034,.012,.013);mesh(head,new T.SphereGeometry(.010,16,12),hair,[side*.064,.025,.150]);curve(head,[[side*.034,.06,.143],[side*.064,.069,.146],[side*.098,.061,.129]],.006,hair);}
+ mesh(head,new T.SphereGeometry(1,20,16),skin,[0,-.018,.152]).scale.set(.025,.052,.035);curve(head,[[-.039,-.105,.129],[0,-.111,.137],[.039,-.105,.129]],.003,material('#79584c'));
+ // Short swept fringe, sideburns, and a closed back of the head.
+ for(let i=0;i<9;i++){const x=(i-4)*.032;segment(head,[x,.17,.077],[x-.035,.085+Math.abs(i-4)*.011,.144-Math.abs(i-4)*.009],.018,hair);}
+ const arms=[];for(const side of[-1,1]){const arm=new T.Group();arm.position.set(side*.30,1.35,0);upper.add(arm);garmentTube(arm,[[0,0,0],[side*.09,-.17,.07],[side*.12,-.30,.20],[side*.10,-.30,.43],[side*.07,-.30,.58]],cloth,'sweatshirt-sleeve');const cuff=mesh(arm,new T.CylinderGeometry(.077,.077,.065,24),rib,[side*.07,-.30,.58]);cuff.rotation.x=Math.PI/2;mesh(arm,new T.SphereGeometry(1,24,16),skin,[side*.065,-.305,.67]).scale.set(.068,.034,.092);for(let i=0;i<4;i++)segment(arm,[side*.065+(i-1.5)*.028,-.31,.71],[side*.065+(i-1.5)*.028,-.32,.79-[.025,0,.005,.025][i]],.012,skin);segment(arm,[side*.02,-.305,.67],[side*-.01,-.32,.73],.019,skin);arms.push(arm);}
+ const seated=makeLegs(root,false,pants,shoe,seam),standing=makeLegs(root,true,pants,shoe,seam);for(const legs of[seated,standing])legs.traverse(o=>{if(o.isMesh&&o.geometry.type==='SphereGeometry'&&Math.abs(o.position.y-.037)<.001)o.material=material('#b5b1a6',.95);});standing.visible=false;let pose='seated',attention=0;
+ function setPose(next){pose=next;const up=next==='standing';seated.visible=!up;standing.visible=up;upper.position.y=up?.12:0;arms.forEach(a=>a.rotation.x=up?.72:0);}
+ return{group:root,head,torso,setPose,get pose(){return pose;},setAttention(angle){attention=angle;upper.rotation.y=angle*.55;head.rotation.y=angle*.45;},tick(time,talking){head.rotation.x=talking?Math.sin(time*.004)*.012:0;head.rotation.y=attention*.45+(talking?Math.sin(time*.002)*.025:0);}};
+}

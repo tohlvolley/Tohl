@@ -1,8 +1,15 @@
 import './first-round-engine.js?v=1';
 import './death-story.js?v=12';
+import './death-engine.js?v=12';
+import {StoryEditor} from './death-editor.js?v=12';
 import {FirstScene} from './first-round-scene.js?v=1';
 const F=window.FirstRound,$=s=>document.querySelector(s),reveal=new window.SixthStory.Reveal();let config=F.defaults(),game=null,scene=null,session=null,mode='title',dialogMode='',draft=null,editorDirty=false,lastSave=0,transitionTimer=null,fallbackPointer=null;
 try{const raw=localStorage.getItem(F.KEY);if(raw)config=F.validate(JSON.parse(raw));}catch{}try{const raw=JSON.parse(localStorage.getItem(F.SAVE));if(raw?.version===1&&raw.stage===2)session=raw;else if(raw?.version===1&&raw.stage===1&&F.Game.restore(raw.round))session=raw;}catch{}
+// Import existing round-two progress into the shared entrance once.
+try{if(!session){const old=JSON.parse(localStorage.getItem('sixth-cast-save-v1'));if(old?.format==='sixth-cast-session'&&old.version===1&&window.SixthEngine.Game.restore(old.game)){session={version:1,stage:2,pendingSecond:false};localStorage.setItem(F.SAVE,JSON.stringify(session));}}}catch{}
+let storyStorage=null;try{storyStorage=localStorage;}catch{}
+const secondEditor=new StoryEditor(new window.SixthStory.Store(storyStorage));
+$('#second-editor-open').onclick=()=>{secondEditor.open();const tools=secondEditor.root.querySelector('.editor-tools'),test=button('保存して2回戦をテスト',()=>{secondEditor.save();if(secondEditor.dirty)return;location.href='death.html?round-test=2&fresh=1';});test.id='second-round-test';tools.append(test);};
 const app=window.LiarApp={get game(){return game;},get scene(){return scene;},get mode(){return mode;},get config(){return config;},use,start,continueGame,save,ready:false};
 function button(label,action){const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',()=>{if(reveal.finish())return;action();});return b;}
 function speak(text,speaker='GM',actions=[],kind='message'){reveal.cancel();dialogMode=kind;$('#speaker').textContent=speaker;$('#dialog').hidden=false;$('#declaration').hidden=kind!=='declare';$('#dismiss').hidden=['intro','result'].includes(kind);$('#choices').replaceChildren(...actions.map(([label,fn])=>button(label,fn)));reveal.start(text,24,t=>$('#text').textContent=t);setEnabled();}

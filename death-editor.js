@@ -1,4 +1,4 @@
-import './death-story.js?v=15';
+import './death-story.js?v=16';
 const S=window.SixthStory,el=(tag,text,cls)=>{const o=document.createElement(tag);if(text!==undefined)o.textContent=text;if(cls)o.className=cls;return o;};
 export class StoryEditor{
  constructor(store,{onOpen=()=>{},onClose=()=>{}}={}){this.store=store;this.onOpen=onOpen;this.onClose=onClose;this.opened=false;this.reveal=new S.Reveal();this.root=el('section',undefined,'story-editor');this.root.id='story-editor';this.root.hidden=true;this.root.setAttribute('aria-label','ゲームエディタ');this.root.setAttribute('role','dialog');this.root.setAttribute('aria-modal','true');this.root.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();this.close();}});document.body.append(this.root);}

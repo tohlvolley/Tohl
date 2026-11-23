@@ -1,6 +1,6 @@
 import * as T from './assets/vendor/three.module.js';
 import {extraItem} from './item-models-extra.js?v=1';
-import {createHost} from './death-host.js?v=11';
+import {createHost} from './death-host.js?v=12';
 const F=window.FirstRound,mat=(color,metalness=0)=>new T.MeshStandardMaterial({color,roughness:.78,metalness});
 function mesh(parent,g,m,x=0,y=0,z=0){const o=new T.Mesh(g,m);o.position.set(x,y,z);parent.add(o);return o;}
 function box(p,w,h,d,m,x=0,y=0,z=0){return mesh(p,new T.BoxGeometry(w,h,d),m,x,y,z);}

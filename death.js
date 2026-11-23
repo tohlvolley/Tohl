@@ -5,7 +5,7 @@ import './death-story.js?v=19';
 import {StoryEditor} from './death-editor.js?v=19';
 import './death-commands.js?v=9';
 import {DeathScene} from './death-scene.js?v=17';
-import {openDiceBinding} from './dice-binding.js?v=1';
+import {openDiceBinding} from './dice-binding.js?v=2';
 import {DECOR_INFO} from './death-props.js?v=2';
 import {gameOver,carryover,createMenu,playVision,clearVision,visionActive} from './campaign-ui.js?v=7';
 const S=window.SixthStory,E=window.SixthEngine,C=window.SixthCommands,$=s=>document.querySelector(s),ROUND_TEST=new URLSearchParams(location.search).get('round-test')==='2',SAVE=ROUND_TEST?'sixth-cast-test-save-v1':'sixth-cast-save-v1';

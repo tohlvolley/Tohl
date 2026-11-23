@@ -1,11 +1,11 @@
-import './death-engine.js?v=16';
-import {inheritedFromCampaign} from './campaign-inventory.js?v=1';
+import './death-engine.js?v=17';
+import {inheritedFromCampaign} from './campaign-inventory.js?v=2';
 import './death-story.js?v=17';
 import {StoryEditor} from './death-editor.js?v=17';
 import './death-commands.js?v=7';
 import {DeathScene} from './death-scene.js?v=16';
 import {DECOR_INFO} from './death-props.js?v=2';
-import {gameOver,carryover,createMenu} from './campaign-ui.js?v=4';
+import {gameOver,carryover,createMenu} from './campaign-ui.js?v=5';
 const S=window.SixthStory,E=window.SixthEngine,C=window.SixthCommands,$=s=>document.querySelector(s),ROUND_TEST=new URLSearchParams(location.search).get('round-test')==='2',SAVE=ROUND_TEST?'sixth-cast-test-save-v1':'sixth-cast-save-v1';
 let storyStorage=null;try{storyStorage=localStorage;}catch{}const story=new S.Store(storyStorage),reveal=new S.Reveal();let currentNarrative=null,resumeNarrative=null;
 const editor=new StoryEditor(story,{onOpen:()=>{reveal.finish();pause();},onClose:()=>{if(currentNarrative){const n=currentNarrative;if(S.entry(story.project,n.id))say(n.id,n.vars,n.page,n.next.filter(id=>S.entry(story.project,id)),true,n.root);else if(S.entry(story.project,n.root))say(n.root,n.vars);else announce('場面の変更を反映しました。');}pause();}});

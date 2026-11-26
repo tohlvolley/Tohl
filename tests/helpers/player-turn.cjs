@@ -1,0 +1,3 @@
+// Existing feature tests start at the player's controls; the dedicated opponent
+// test covers the full first-player digest and its 3D presentation.
+module.exports=async function playerTurn(p){if(await p.evaluate(()=>SixthApp.game.phase==='opponent'))await p.evaluate(()=>{while(SixthApp.game.phase==='opponent')SixthApp.game.advanceOpponent();SixthApp.sync(true);});for(let i=0;i<30;i++){if(await p.locator('#story-next').isVisible())await p.click('#story-next');else if(await p.getByRole('button',{name:'自分の手番を始める',exact:true}).isVisible())await p.getByRole('button',{name:'自分の手番を始める',exact:true}).click();else break;}};

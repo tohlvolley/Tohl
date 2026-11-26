@@ -2,9 +2,9 @@ import {sound} from './game-audio.js?v=1';
 import './first-round-engine.js?v=7';
 import {roundOneInventory,submittedCarryOnly,inventoryGroups} from './campaign-inventory.js?v=3';
 import {gameOver,createMenu,playVision,clearVision,visionActive} from './campaign-ui.js?v=7';
-import './death-story.js?v=19';
-import './death-engine.js?v=19';
-import {StoryEditor} from './death-editor.js?v=19';
+import './death-story.js?v=20';
+import './death-engine.js?v=20';
+import {StoryEditor} from './death-editor.js?v=20';
 import {FirstScene} from './first-round-scene.js?v=7';
 const F=window.FirstRound,$=s=>document.querySelector(s),reveal=new window.SixthStory.Reveal();let config=F.defaults(),game=null,scene=null,session=null,mode='title',dialogMode='',draft=null,editorDirty=false,lastSave=0,transitionTimer=null,eventTimer=null,fallbackPointer=null;
 try{const raw=localStorage.getItem(F.KEY);if(raw)config=F.upgradeConfig(JSON.parse(raw));}catch{}try{const raw=JSON.parse(localStorage.getItem(F.SAVE));if(raw?.version===1&&(raw.stage===2||raw.stage===3&&raw.inventory?.version===1&&Array.isArray(raw.inventory.items)))session=raw;else if(raw?.version===1&&raw.stage===1&&F.Game.restore(raw.round))session=raw;}catch{}
